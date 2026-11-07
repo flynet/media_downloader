@@ -9,11 +9,13 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** FileNames tests (TZ section 9): sanitization, length clipping, name conflicts. */
+/** Тесты FileNames (TZ раздел 9): санитизация, обрезка длины, конфликты имён.
+ *  FileNames tests (TZ section 9): sanitization, length clipping, name conflicts. */
 class FileNamesTest {
 
     @Test
     void sanitizesIllegalCharacters() {
+        // каждый запрещённый в Windows символ -> '_', концевые точки/пробелы снимаются
         // every Windows-illegal char -> '_', trailing dots/spaces stripped
         assertEquals("a_b________c", FileNames.sanitize("a<b>:\"/\\|?*c"));
     }

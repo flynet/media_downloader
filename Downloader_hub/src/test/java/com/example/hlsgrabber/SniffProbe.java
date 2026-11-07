@@ -10,6 +10,12 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
+ * Проба снифера: открывает реальную страницу в продуктовом BrowserLauncher
+ * (headful, persistent context) и печатает в stdout КАЖДЫЙ GET/HEAD-ответ,
+ * видимый контекстом (метод, статус, content-type, content-length,
+ * content-range, url, frame). Диагностика обнаружения на реальных сайтах
+ * (плейлисты с нестандартными content-type, Range/206 медиа-запросы,
+ * трафик только сегментов).
  * Sniffing probe: opens a real page in the product BrowserLauncher (headful, persistent
  * context) and dumps EVERY GET/HEAD response seen by the context (method, status,
  * content-type, content-length, content-range, url, frame) to stdout. Diagnostic for

@@ -11,6 +11,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
+ * Снифер-проверка на стенде (headless через BrowserLauncher): реальный продуктовый
+ * NetworkSniffer + pump на локальном HLS-стенде; печатает рядки, masterUrl,
+ * recorded-карту и recorded-lookup для стендовых сегментов/ключей. Переиспользует
+ * существующие gen/static-файлы из E2E-прогонов.
  * Stand-focused sniffer check (headless via BrowserLauncher): real product
  * NetworkSniffer + pump on the local HLS stand; prints rows, masterUrl, recorded
  * map, and recorded lookups for stand segments/keys. Reuses existing gen/static
@@ -39,6 +43,8 @@ public class StandCheck {
             long t0 = System.currentTimeMillis();
             while (System.currentTimeMillis() - t0 < 60_000) {
                 Thread.sleep(5000);
+                // крутим воспроизведение headful: +30 с currentTime за тик, чтобы
+                // hls.js грузил каждый сегмент по порядку (headful-старт страницы ~25 с)
                 // drive playback headful: jump currentTime +30s per tick so hls.js
                 // loads every segment in order (headful page start is ~25s)
                 StringBuilder agg = new StringBuilder();

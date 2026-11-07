@@ -12,27 +12,39 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
+ * Парсер player response YouTube (ответ inner-tube {@code /youtubei/v1/player}).
  * Parser of a YouTube player response (inner-tube {@code /youtubei/v1/player} answer).
  *
- * <p>Real-site facts (Nov 2026, verified by harness):
+ * <p>Факты реального сайта (ноябрь 2026, проверено харнессом):
+ * Real-site facts (Nov 2026, verified by harness):
  * <ul>
- *   <li>the WEB player response carries NO per-format URLs — YouTube serves media over
+ *   <li>WEB player response не содержит URL на формат — YouTube отдаёт медиа
+ *       серверным ABR (SABR) с упаковкой UMP, поэтому общий сетевой sniffer видит
+ *       только POST /videoplayback (application/vnd.yt-ump) и никогда манифест;
+ *       the WEB player response carries NO per-format URLs — YouTube serves media over
  *       server-side ABR (SABR) with UMP framing, so the generic network sniffer sees
  *       only POST /videoplayback (application/vnd.yt-ump) and never a manifest;</li>
- *   <li>the VISIONOS inner-tube client still returns CLASSIC signed stream URLs
+ *   <li>inner-tube клиент VISIONOS по-прежнему возвращает CLASSIC подписанные URL
+ *       (обычный {@code url}, без параметра дросселирования {@code n}) для каждого
+ *       адаптивного формата, если запрос несёт {@code visitorData} страницы;
+ *       the VISIONOS inner-tube client still returns CLASSIC signed stream URLs
  *       (plain {@code url}, no {@code n} throttle param) for every adaptive format,
  *       provided the request carries the page's {@code visitorData};</li>
- *   <li>those URLs answer a plain Range GET with 206 and the expected content range,
+ *   <li>эти URL отвечают обычному Range GET кодом 206 с ожидаемым диапазоном,
+ *       поэтому загрузка — обычный чанкованный HTTP GET + mux FFmpeg.
+ *       those URLs answer a plain Range GET with 206 and the expected content range,
  *       so the download is an ordinary chunked HTTP GET + FFmpeg mux.</li>
  * </ul>
  *
- * <p>Signed URLs are kept in memory only and never logged; the log shows host+path.
+ * <p>Подписанные URL хранятся только в памяти и не логируются; в логе виден host+path.
+ * Signed URLs are kept in memory only and never logged; the log shows host+path.
  */
 public final class YouTubePlayer {
 
     private static final Logger log = LoggerFactory.getLogger(YouTubePlayer.class);
 
-    /** Parsed player response: what the downloader needs. */
+    /** Разобранный player response: то, что нужно загрузчику.
+     *  Parsed player response: what the downloader needs. */
     public record Player(String videoId,
                          String title,
                          String status,
@@ -40,7 +52,8 @@ public final class YouTubePlayer {
                          long durationSeconds,
                          List<YouTubeFormat> formats) {
 
-        /** true when the video is playable for this session. */
+        /** true, когда видео воспроизводимо для этой сессии.
+         *  true when the video is playable for this session. */
         public boolean ok() {
             return "OK".equals(status);
         }
@@ -49,7 +62,9 @@ public final class YouTubePlayer {
     private YouTubePlayer() {
     }
 
-    /** Parses the raw JSON; never throws on malformed input (returns a "not playable" player). */
+    /** Разбирает сырой JSON; не бросает исключение при некорректном вводе
+     *  (возвращает player «не воспроизводится»).
+     *  Parses the raw JSON; never throws on malformed input (returns a "not playable" player). */
     public static Player parse(String json) {
         if (json == null || json.isBlank()) {
             return new Player(null, null, "EMPTY", false, 0, List.of());
@@ -113,6 +128,8 @@ public final class YouTubePlayer {
             String url = optString(f, "url");
             boolean cipherOnly = false;
             if ((url == null || url.isBlank()) && f.has("signatureCipher")) {
+                // плеер дал decipherable cipher: функция дешифровки из
+                // base.js не реализована (вне объёма стадии 7)
                 // the player handed a decipherable cipher: the signature function from
                 // base.js is not implemented (out of scope for stage 7)
                 cipherOnly = true;
@@ -138,6 +155,10 @@ public final class YouTubePlayer {
     }
 
     /**
+     * Выбор видеоформата: наибольшая высота, не превышающая {@code cap} (0 = без
+     * ограничения); когда все форматы выше cap, берётся общая наибольшая; равные
+     * высоты разрешаются большим битрейтом, и MP4 (avc1) побеждает WebM (vp9),
+     * чтобы результат можно было смуксить в MP4-контейнер без перекодирования.
      * Video format pick: highest height not exceeding {@code cap} (0 = no cap); when
      * every format is above the cap, the overall highest is taken; equal heights are
      * broken by the higher bitrate, and MP4 (avc1) wins over WebM (vp9) so the result
@@ -164,6 +185,7 @@ public final class YouTubePlayer {
             }
         }
         if (best == null) {
+            // cap ниже всех доступных высот: взять лучшее доступное качество
             // cap below every available height: take the best available quality
             for (YouTubeFormat f : candidates) {
                 if (betterVideo(f, best)) {
@@ -190,6 +212,8 @@ public final class YouTubePlayer {
     }
 
     /**
+     * Выбор аудиоформата: аудиодорожка с наибольшим битрейтом; MP4 (m4a/aac)
+     * побеждает WebM (opus), чтобы соответствовать MP4-контейнеру видео.
      * Audio format pick: the highest-bitrate audio track; MP4 (m4a/aac) wins over
      * WebM (opus) so it matches the MP4 video container.
      */
@@ -218,7 +242,8 @@ public final class YouTubePlayer {
         return best;
     }
 
-    /** Distinct heights of video formats, descending (the FOUND-row quality list). */
+    /** Различные высоты видеоформатов, по убыванию (список качеств FOUND-строки).
+     *  Distinct heights of video formats, descending (the FOUND-row quality list). */
     public static List<Integer> qualities(Player player) {
         return player.formats().stream()
                 .filter(f -> f.hasVideo() && f.url() != null && f.height() > 0)
@@ -228,7 +253,8 @@ public final class YouTubePlayer {
                 .toList();
     }
 
-    /** Human-readable reason for a non-OK playability status (Russian, for the UI). */
+    /** Человеческое объяснение не-OK playability статуса (русский, для UI).
+     *  Human-readable reason for a non-OK playability status (Russian, for the UI). */
     public static String reasonOf(Player player) {
         if (player.status() == null) {
             return "нет данных о воспроизводимости";
@@ -244,7 +270,7 @@ public final class YouTubePlayer {
         };
     }
 
-    // ---------- tiny JSON helpers (Gson) ----------
+    // ---------- крошечные JSON-хелперы (Gson) / tiny JSON helpers (Gson) ----------
 
     private static JsonObject obj(JsonObject root, String name) {
         if (root == null || !root.has(name) || root.get(name).isJsonNull()) {

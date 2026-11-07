@@ -8,6 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
+ * Выбор youtube-формата (TZ 5.2.3 + требование пользователя): максимальное качество,
+ * не превышающее лимит, при равенстве — по битрейту, MP4 предпочтительнее WebM для
+ * склейки.
+ *
  * YouTube format selection (TZ 5.2.3 + user requirement): the highest quality not
  * exceeding the cap, ties broken by bitrate, MP4 preferred over WebM for muxing.
  */
@@ -62,6 +66,7 @@ class YouTubePlayerTest {
         YouTubeFormat v = YouTubePlayer.pickVideo(p, 1080);
         assertNotNull(v);
         assertEquals(1080, v.height());
+        // MP4 побеждает WebM с бо́льшим битрейтом при той же высоте (muxable into MP4)
         // MP4 wins over the higher-bitrate WebM at the same height (muxable into MP4)
         assertEquals(299, v.itag());
         assertEquals("mp4", v.container());
@@ -78,6 +83,8 @@ class YouTubePlayerTest {
     @Test
     void capBelowAllFallsBackToOverallBest() {
         YouTubePlayer.Player p = YouTubePlayer.parse(JSON);
+        // все доступные высоты выше лимита -> берётся лучший из всех
+        // (требование пользователя: лимит ниже всех -> общий максимум)
         // every available height is above the cap -> the overall best is taken
         // (user requirement: cap below all -> the common maximum)
         YouTubeFormat v = YouTubePlayer.pickVideo(p, 360);

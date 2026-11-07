@@ -14,6 +14,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
+ * Probe3: воспроизводит ПОЛНЫЙ продуктовый конвейер GUI (BrowserLauncher + SourceRegistry +
+ * NetworkSniffer + DownloadQueue + FfmpegRunner) на реальном сайте, headful, с профилем
+ * пользователя, без Swing-окна.
+ *
+ * Playwright round-trips с главного потока воюют с pump sniffера во время штормов событий
+ * загрузки страницы (probe4: Space -> "Cannot find parent object request@...").
+ * Триггер play — page.evaluate(video.play()) с повтором каждые 5 с: evaluate шторм
+ * переносит (R1 spike + evidence pump), клавиатура/локатор — нет.
+ *
  * Probe3: replicates the FULL product GUI pipeline (BrowserLauncher + SourceRegistry +
  * NetworkSniffer + DownloadQueue + FfmpegRunner) on a real site, headful, with the user
  * profile, minus the Swing window.
@@ -44,6 +53,7 @@ public class Probe3Harness {
         settings.downloadDir = out.toString();
         settings.minSizeBytes = 1_048_576;
         settings.parallelSegments = 6;
+        // зеркало настроек приёмки GUI
         settings.targetHeight = 720;  // mirror GUI acceptance settings
 
         FfmpegRunner ffmpeg = new FfmpegRunner();
@@ -60,6 +70,7 @@ public class Probe3Harness {
 
         launcher.openPage(url);
         System.out.println("[P3] page loaded t=0 events=" + sniffer.eventCount());
+        // баннер сразу, чтобы пользователь увидел подсказку до первого тика
         // banner immediately so the user sees the hint before the first tick
         try {
             page.evaluate("() => { if (!document.getElementById('probe-banner')) { const d = document.createElement('div'); d.id = 'probe-banner'; d.style.cssText = 'position:fixed;top:8px;right:8px;z-index:2147483647;background:rgba(20,20,60,.92);color:#fff;font:14px monospace;padding:10px 14px;border-radius:8px;max-width:430px'; d.textContent = 'HLS Grabber (probe): the program drives the player (mouse click + Space, real trusted gestures). Press play on the player, Space, arrows, J/K. Do NOT close the window.'; document.body.appendChild(d); } }");
@@ -76,10 +87,20 @@ public class Probe3Harness {
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(5_000);
             int t = (int) ((System.currentTimeMillis() - start) / 1000);
+            // probe6-затык: querySelector('video') на главной странице попадает в
+            // пре-ролл рекламного плеера (rs=0 t=0/0 вечно); настоящий плеер живёт в
+            // iframe. Играть ВСЕ видео во ВСЕХ frame; ended = видео любого frame
+            // закончилось (duration>0, currentTime>=duration-0.7).
             // probe6 stall: querySelector('video') on the main page hits the ad
             // pre-roll player (rs=0 t=0/0 forever); the real player lives in an
             // iframe. Play EVERY video in EVERY frame; ended = any frame's video
             // finished (duration>0, currentTime>=duration-0.7).
+            // probe7: play-all-frames запускает play на настоящем плеере (видео рекламы
+            // 5s/14s ENDED), сегменты 0-5 скачаны, затем воспроизведение встаёт на ~10-15 с
+            // (пре-ролл плеера ставит главный видео на паузу). Крутим воспроизведение: прыжок
+            // currentTime +30 с каждые 5 с (6x скорость) на длинных видео, чтобы
+            // плеер грузил каждый сегмент 0..N по порядку; воркер собирает
+            // записанные подписные URL. ended = самое длинное видео закончилось.
             // probe7: play-all-frames fires play on the real player (ad videos
             // 5s/14s ENDED), segs 0-5 fetched, then playback stalls at ~10-15s
             // (player pre-roll pauses the main video). Drive playback: jump
@@ -88,6 +109,7 @@ public class Probe3Harness {
             // the recorded signed URLs. ended = longest video finished.
             String play;
             StringBuilder agg = new StringBuilder();
+            // видимый баннер пользователю один раз: программа управляет страницей
             // visible banner for the user once: the program drives the page
             try {
                 if (attempts == 0) {
@@ -99,6 +121,10 @@ public class Probe3Harness {
             boolean pageClosed = false;
             try {
                 com.microsoft.playwright.Frame main = page.mainFrame();
+                // плеер, знающий про frame: 123av (и iframe-плееры в целом) держат
+                // video-элемент внутри iframe, не в главном frame. Выбрать frame,
+                // чьё видео имеет конечную длительность (настоящий плеер), фолбэк к
+                // любому frame с видео, фолбэк к main.
                 // frame-aware player: 123av (and iframe players generally) keep the
                 // video element inside an iframe, not the main frame. Pick the frame
                 // whose video has a finite duration (the real player), fallback to
@@ -162,6 +188,8 @@ public class Probe3Harness {
                                 ok = true;
                             }
                         } else {
+                            // iframe-плеер: boundingBox элемента <iframe> в
+                            // координатах верхнего уровня страницы, кликается page.mouse()
                             // iframe player: boundingBox of the <iframe> element is in
                             // top-level page coordinates, clickable by page.mouse()
                             com.microsoft.playwright.options.BoundingBox bb =
@@ -217,6 +245,8 @@ public class Probe3Harness {
                 break;
             }
             if (ended) {
+                // воспроизведение закончилось: дать воркеру 60 с, чтобы доборать
+                // записанные сегменты
                 // playback finished: give the worker 60 s to drain recorded segments
                 long drainEnd = System.currentTimeMillis() + 60_000;
                 while (System.currentTimeMillis() < drainEnd) {

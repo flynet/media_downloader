@@ -18,6 +18,13 @@ import java.util.concurrent.atomic.AtomicReference;
  * Upper GUI section (TZ 5.2): URL input + "Открыть URL" (browser navigation off the EDT)
  * and the rows panel (BoxLayout, not JTable). A ~700 ms timer repaints snapshots from
  * the registry; buttons dispatch actions to the queue.
+ *
+ * Upper GUI section (TZ 5.2): URL input + "Open URL" (browser navigation off the EDT)
+ * and the rows panel (BoxLayout, not JTable). A ~700 ms timer repaints snapshots from
+ * the registry; buttons dispatch actions to the queue.
+ * Центральная панель окна: поле URL, список качеств, список
+ * источников (закачаных), кнопки, лог. Плюс монитор буфера обмена
+ * (авто-детект ссылок, TZ section 12).
  */
 public final class SourceListPanel extends JPanel {
 
@@ -29,7 +36,7 @@ public final class SourceListPanel extends JPanel {
     private final Map<String, SourceRowPanel> rows = new LinkedHashMap<>();
     private final JPanel listArea = new JPanel();
     private final JTextField urlField = new JTextField();
-    private final JButton openUrlBtn = new JButton("Открыть URL");
+    private final JButton openUrlBtn = new JButton("Открыть URL / Open URL");
 
     public SourceListPanel(SourceRegistry registry, DownloadQueue queue,
                            AtomicReference<BrowserLauncher> launcher) {
@@ -41,7 +48,7 @@ public final class SourceListPanel extends JPanel {
 
         JPanel top = new JPanel(new BorderLayout(6, 0));
         openUrlBtn.setEnabled(false);
-        openUrlBtn.setToolTipText("Браузер ещё не готов");
+        openUrlBtn.setToolTipText("Браузер ещё не готов / browser not ready yet");
         openUrlBtn.addActionListener(e -> {
             String u = urlField.getText().trim();
             if (u.isEmpty()) {
@@ -50,13 +57,13 @@ public final class SourceListPanel extends JPanel {
             new Thread(() -> {
                 BrowserLauncher l = launcher.get();
                 if (l == null) {
-                    log.info("Браузер ещё не готов — URL не открыт: {}", u);
+                    log.info("Браузер ещё не готов / browser not ready — URL не открыт / URL not opened: {}", u);
                     return;
                 }
                 try {
                     l.openPage(u);
                 } catch (Exception ex) {
-                    log.warn("Не удалось открыть {}: {}", u, ex.toString());
+                    log.warn("Не удалось открыть / failed to open {}: {}", u, ex.toString());
                 }
             }, "open-url").start();
         });
@@ -101,15 +108,18 @@ public final class SourceListPanel extends JPanel {
         timer.start();
     }
 
-    /** Enables/disables the «Открыть URL» button (browser readiness). EDT-safe. */
+    /** Разрешает/запрещает кнопку «Открыть URL / Open URL» (готовность браузера). EDT-safe.
+     *  Enables/disables the «Открыть URL / Open URL» button (browser readiness). EDT-safe. */
     public void setOpenEnabled(boolean enabled) {
         SwingUtilities.invokeLater(() -> {
             openUrlBtn.setEnabled(enabled);
-            openUrlBtn.setToolTipText(enabled ? "Открыть URL в браузере" : "Браузер ещё не готов");
+            openUrlBtn.setToolTipText(enabled ? "Открыть URL в браузере / open URL in the browser"
+                    : "Браузер ещё не готов / browser not ready yet");
         });
     }
 
-    /** Runs on the EDT (Swing Timer). */
+    /** Работает на EDT (Swing Timer).
+     *  Runs on the EDT (Swing Timer). */
     private void refresh(SourceRowPanel.RowActions actions) {
         boolean added = false;
         for (SourceRecord r : registry.records()) {
@@ -135,7 +145,7 @@ public final class SourceListPanel extends JPanel {
                     Desktop.getDesktop().open(dir.toFile());
                 }
             } catch (Exception e) {
-                log.debug("open folder: {}", e.getMessage());
+                log.debug("open folder / открытие папки: {}", e.getMessage());
             }
         }, "open-folder").start();
     }

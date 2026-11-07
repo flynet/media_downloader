@@ -7,7 +7,7 @@ rem  Steps: 1) mvn clean package  2) jlink runtime  3) jpackage app-image
 rem         4) bundle Playwright browsers  5) launch GUI
 rem  Requires: JDK 21 (Temurin) and Maven 3.9+, Windows x64.
 rem  Edit JDK=/MAVEN_CMD below to point to YOUR install (paths here are the
-rem  author's). See README section "Сборка из исходников" / "Building from source".
+rem  author's). See README section "Сборка из исходников" / English "Building from Sources".
 rem =====================================================================
 
 set "ROOT=%~dp0"

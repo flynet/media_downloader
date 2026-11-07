@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.Set;
 
 /**
+ * Windows-safe именование файлов (TZ 6.1): санитизация, обрезка длины, суффиксы конфликтов /
  * Windows-safe file naming (TZ 6.1): sanitize, length clipping, conflict suffixes.
  */
 public final class FileNames {
@@ -19,7 +20,7 @@ public final class FileNames {
     private FileNames() {
     }
 
-    /** Replace characters illegal on Windows, control chars, trailing dots/spaces. */
+    /** Заменяет запрещённые в Windows символы, control-символы, trailing точки/пробелы / Replace characters illegal on Windows, control chars, trailing dots/spaces. */
     public static String sanitize(String name) {
         String s = name.replaceAll("[<>:\"/\\\\|?*\\x00-\\x1F]", "_");
         s = s.replaceAll("[. ]+$", "");
@@ -35,6 +36,7 @@ public final class FileNames {
     }
 
     /**
+     * Обрезает sanitized base name, чтобы dir + name + ext оставались под Windows MAX_PATH /
      * Clip a sanitized base name so dir + name + ext stays under Windows MAX_PATH.
      */
     public static String clip(String dir, String base, String ext) {
@@ -44,6 +46,8 @@ public final class FileNames {
     }
 
     /**
+     * Финальный путь для {@code base.ext} в {@code dir}; при конфликте добавляет
+     * {@code " (1)"}, {@code " (2)"}, ... /
      * Final path for {@code base.ext} in {@code dir}; on conflict appends {@code " (1)"}, {@code " (2)"}, ...
      */
     public static File uniquePath(File dir, String base, String ext) {
@@ -58,6 +62,7 @@ public final class FileNames {
     }
 
     /**
+     * One-shot: sanitize + clip + uniqueness, возвращает финальный File /
      * One-shot: sanitize + clip + uniqueness, returns final File.
      */
     public static File build(File dir, String pageName, String ext) {

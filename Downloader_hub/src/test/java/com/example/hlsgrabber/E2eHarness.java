@@ -23,6 +23,11 @@ import java.util.List;
 import java.util.concurrent.Executors;
 
 /**
+ * Смоук этапа 2 end-to-end: локальный HLS-стенд (spikes/r1-r2 static+gen) + реальный
+ * продуктовый конвейер (BrowserLauncher persistent context → NetworkSniffer →
+ * SourceRegistry → DownloadQueue auto-enqueue → SegmentDownloader дешифрование+склейка → mp4),
+ * проверка через ffprobe.
+ *
  * Stage 2 end-to-end smoke: local HLS stand (spikes/r1-r2 static+gen) + the real product
  * pipeline (BrowserLauncher persistent context → NetworkSniffer → SourceRegistry →
  * DownloadQueue auto-enqueue → SegmentDownloader decrypt+concat → mp4), verified by ffprobe.
@@ -31,6 +36,7 @@ import java.util.concurrent.Executors;
  *   java -cp "target\hls-grabber-1.0-SNAPSHOT.jar;target\test-classes" \
  *       com.example.hlsgrabber.E2eHarness D:\Java\Downloader\spikes\r1-r2
  *
+ * Выход 0 = PASS (mp4 скачан, проверен, воспроизводим), 1 = FAIL.
  * Exit 0 = PASS (mp4 downloaded, probed, playable), 1 = FAIL.
  */
 public final class E2eHarness {
@@ -47,6 +53,7 @@ public final class E2eHarness {
         OUT = ROOT.resolve("e2e-out");
         Files.createDirectories(GEN);
         Files.createDirectories(OUT);
+        // удалить устаревшие mp4 прошлых прогонов, чтобы детекция успеха была однозначной
         // remove stale mp4 from previous runs so success detection is unambiguous
         try (var walk = Files.list(OUT)) {
             walk.filter(p -> p.toString().endsWith(".mp4")).forEach(p -> {
@@ -61,7 +68,7 @@ public final class E2eHarness {
 
         Settings s = new Settings();
         s.downloadDir = OUT.toString();
-        s.userAgent = null;          // browser default UA
+        s.userAgent = null;          // браузерный UA по умолчанию / browser default UA
         s.targetHeight = 1080;
         s.parallelSegments = 4;
         s.minSizeBytes = 1_048_576L;
@@ -82,12 +89,19 @@ public final class E2eHarness {
 
         launcher.openPage(BASE + "/hls-play.html");
 
+        // MP4 открывается в НОВОЙ вкладке: уход pages().get(0) с hls-play.html
+        // останавливает воспроизведение hls.js и поток сегментов (прогон 5 встал
+        // на 8/15 ровно на второй навигации openPage)
         // MP4 opens in a NEW tab: navigating pages().get(0) away from hls-play.html
         // stops hls.js playback and the segment flow (run 5 stalled at 8/15 exactly
         // at the second openPage navigation)
         // run 6: ctx.newPage() in a persistent context races page attachment —
+        // прогон 6: ctx.newPage() в persistent context гонит гонку с attach страницы —
+        // navigation бьёт в mainFrame=null. Повторять navigate, пока кадр не готов.
         // navigate hits mainFrame=null. Retry navigate until the frame is ready.
         // run 7: ctx.newPage() can return null under the dispatch storm; retry
+        // прогон 7: ctx.newPage() может вернуть null под штормом dispatch; повторять
+        // сам newPage и null-гардить каждое использование mp4Page.
         // the newPage itself and null-guard every use of mp4Page.
         Page mp4Page = null;
         for (int i = 0; i < 5 && mp4Page == null; i++) {
@@ -117,11 +131,15 @@ public final class E2eHarness {
             }
         }
 
+        // каноникалы стендовых файлов (синтезированная семейством запись index-v1-a1.m3u8
+        // из подсчёта .ts-сегментов не должна захватить цель)
         // canonicals of the stand files (family-synthesized index-v1-a1.m3u8 record
         // from .ts segment counting must not hijack the target)
         final String hlsCanonical = BASE + "/out.m3u8";
         final String mp4Canonical = BASE + "/big.mp4";
 
+        // единый опрос: openPage может блокироваться десятки секунд под штормом dispatch,
+        // поэтому обе ветви опрашиваются вместе после обеих навигаций
         // unified poll: openPage can block tens of seconds under the dispatch storm,
         // so both branches are polled together after both navigations
         SourceRecord target = null;
@@ -133,6 +151,10 @@ public final class E2eHarness {
         long deadline = System.currentTimeMillis() + 150_000;
         long lastDrive = 0;
         while (System.currentTimeMillis() < deadline) {
+            // headless-воспроизведение на стенде встает после ~2-3 сегментов (медиа-конвейер
+            // паузится в headless Chrome). Крутим плеер: play + seek-прыжок +30 с каждые 5 с,
+            // чтобы hls.js грузил каждый сегмент по порядку — ровно тот headful-сценарий
+            // просмотра, на который опирается продукт.
             // headless stand playback stalls after ~2-3 segments (media pipeline
             // pauses in headless Chrome). Drive the player: play + seek-jump +30s
             // per 5s tick so hls.js loads every segment in order — exactly the
@@ -160,6 +182,8 @@ public final class E2eHarness {
                 if (r.kind == SourceRecord.Kind.HLS && hlsCanonical.equals(r.canonicalUrl)) {
                     target = r;
                     SourceRecord.State st = r.state();
+                    // постановка в очередь по кнопке (TZ 9 строка 192): стенд эмулирует клик
+                    // пользователя «Скачать», когда источник обнаружен и остаётся FOUND
                     // button-driven enqueue (TZ 9 line 192): the harness emulates the user
                     // clicking "Скачать" once the source is detected and stays FOUND
                     if (st == SourceRecord.State.FOUND && !hlsEnqueued) {
@@ -244,6 +268,7 @@ public final class E2eHarness {
         System.exit(playable && mp4Ok ? 0 : 1);
     }
 
+    // ---------- локальный HLS-стенд (та же раскладка, что spikes/r1-r2) ----------
     // ---------- local HLS stand (same layout as spikes/r1-r2) ----------
 
     static void prepareKeys() throws Exception {
@@ -282,7 +307,8 @@ public final class E2eHarness {
         }
     }
 
-    /** Direct-download stand file: plain progressive MP4 > 1 MB (no HLS, no segments). */
+    /** Стендовый файл прямой загрузки: обычный прогрессивный MP4 > 1 МБ (без HLS, без сегментов).
+     *  Direct-download stand file: plain progressive MP4 > 1 MB (no HLS, no segments). */
     static void generateBigMp4() throws Exception {
         String exe = org.bytedeco.javacpp.Loader.load(
                 org.bytedeco.ffmpeg.ffmpeg.class).toString();

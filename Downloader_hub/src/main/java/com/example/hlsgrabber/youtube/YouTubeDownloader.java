@@ -22,26 +22,37 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * Конвейер загрузки YouTube (стадия 7).
  * YouTube download pipeline (stage 7).
  *
- * <p>Real-site facts (Nov 2026, verified by harness):
+ * <p>Факты реального сайта (ноябрь 2026, проверено харнессом):
+ * Real-site facts (Nov 2026, verified by harness):
  * <ul>
- *   <li>the web player serves media over server-side ABR (SABR/UMP) — no per-format
+ *   <li>веб-плеер отдаёт медиа серверным ABR (SABR/UMP) — URL на формат отсутствуют,
+ *       поэтому общий сетевой sniffer не видит ничего, что можно скачать;
+ *       the web player serves media over server-side ABR (SABR/UMP) — no per-format
  *       URLs, so the generic network sniffer cannot see anything to download;</li>
- *   <li>the VISIONOS inner-tube client still returns CLASSIC signed URLs, and those
+ *   <li>inner-tube клиент VISIONOS по-прежнему возвращает CLASSIC подписанные URL,
+ *       и эти URL отвечают обычному Range GET кодом 206 + ожидаемый диапазон;
+ *       the VISIONOS inner-tube client still returns CLASSIC signed URLs, and those
  *       URLs answer a plain Range GET with 206 + the expected content range;</li>
- *   <li>adaptive formats are video-only + audio-only, so the tracks are downloaded
+ *   <li>адаптивные форматы — видео-_only + аудио-only, поэтому дорожки скачиваются
+ *       отдельно и микшируются FFmpeg (-c copy, без перекодирования).
+ *       adaptive formats are video-only + audio-only, so the tracks are downloaded
  *       separately and muxed with FFmpeg (-c copy, no re-encode).</li>
  * </ul>
  *
- * <p>Chunking follows the segment-parallelism setting (TZ 6.1): the file is split into
+ * <p>Чанкование следует настройке параллелизма сегментов (TZ 6.1): файл делится на
+ * 8 МБ диапазоны, загружаемые одновременно и записываемые по абсолютным смещениям.
+ * Chunking follows the segment-parallelism setting (TZ 6.1): the file is split into
  * 8 MB ranges fetched concurrently and written at their absolute offsets.
  */
 public final class YouTubeDownloader {
 
     private static final Logger log = LoggerFactory.getLogger(YouTubeDownloader.class);
 
-    /** Chunk size of the parallel range download. */
+    /** Размер чанка параллельной загрузки диапазона.
+     *  Chunk size of the parallel range download. */
     private static final long CHUNK = 8L * 1024 * 1024;
 
     private final HttpFetcher fetcher;
@@ -65,12 +76,15 @@ public final class YouTubeDownloader {
     }
 
     /**
+     * Скачивает видео (и его аудиодорожку) и микширует их в один файл.
      * Downloads the video (and its audio track) and muxes them into a single file.
      *
-     * @param playerJson raw inner-tube player response
-     * @param outDir     target directory
-     * @param name       output file base name
-     * @param cap        selected max height (0 = best available)
+     * @param playerJson сырой inner-tube player response
+     *                   / raw inner-tube player response
+     * @param outDir     целевая директория / target directory
+     * @param name       базовое имя выходного файла / output file base name
+     * @param cap        выбранная макс. высота (0 = лучшее доступное)
+     *                   / selected max height (0 = best available)
      */
     public Path download(String playerJson, Path outDir, String name, int cap) throws Exception {
         YouTubePlayer.Player player = YouTubePlayer.parse(playerJson);
@@ -114,6 +128,8 @@ public final class YouTubeDownloader {
     }
 
     /**
+     * Загрузка одной дорожки чанками по диапазонам в {@code target}: файл пишется
+     * по абсолютным смещениям, поэтому чанки могут прийти в любом порядке.
      * Range-chunk download of one track into {@code target}: the file is written by
      * absolute offsets, so chunks may arrive in any order.
      */
@@ -123,6 +139,7 @@ public final class YouTubeDownloader {
             total = fetcher.probeRangeTotal(format.url());
         }
         if (total <= 0) {
+            // нет поддержки Range / неизвестный размер: одиночный streaming GET
             // no Range support / unknown size: single streaming GET
             log.info("YouTube: {} без Range, скачивание целиком", stage);
             fetcher.getToFile(format.url(), target, 0, listener);
@@ -190,7 +207,8 @@ public final class YouTubeDownloader {
         }
     }
 
-    /** Masked URL for logs (signed params never reach the console). */
+    /** Замаскированный URL для логов (подписанные параметры никогда не попадают в консоль).
+     *  Masked URL for logs (signed params never reach the console). */
     static String masked(String url) {
         return UrlUtils.masked(url);
     }

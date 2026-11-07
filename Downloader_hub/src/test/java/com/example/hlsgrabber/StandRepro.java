@@ -3,7 +3,8 @@ package com.example.hlsgrabber;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/** StandCheck repro: start the E2E stand server and fetch /hls-play.html directly. */
+/** Репро StandCheck: поднять E2E-стенд-сервер и fetchнуть /hls-play.html напрямую.
+ *  StandCheck repro: start the E2E stand server and fetch /hls-play.html directly. */
 public class StandRepro {
     public static void main(String[] args) throws Exception {
         com.sun.net.httpserver.HttpServer s = E2eHarness.startServer();

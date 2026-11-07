@@ -1,12 +1,15 @@
 package com.example.hlsgrabber.download;
 
-/** Progress callbacks for downloads; thread-safe, non-EDT safe usage expected. */
+/** Прогресс-колбэки загрузок; thread-safe, ожидается использование вне EDT.
+ *  Progress callbacks for downloads; thread-safe, non-EDT safe usage expected. */
 public interface ProgressListener {
 
-    /** stage: "загрузка сегментов", "склейка", "мультиплексирование", "загрузка файла". */
+    /** стадия: «загрузка сегментов», «склейка», «мультиплексирование», «загрузка файла».
+     *  stage: "загрузка сегментов", "склейка", "мультиплексирование", "загрузка файла". */
     void onProgress(int done, int total, long bytesReceived, String stage);
 
-    /** cooperative cancellation check. */
+    /** кооперативная проверка отмены.
+     *  cooperative cancellation check. */
     boolean isCancelled();
 
     ProgressListener NOOP = new ProgressListener() {

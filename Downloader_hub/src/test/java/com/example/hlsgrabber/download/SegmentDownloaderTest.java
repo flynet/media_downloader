@@ -11,6 +11,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
+ * Тесты выбора максимального качества (требование пользователя): загрузка берёт
+ * наивысший вариант, не превышающий лимит (targetHeight, 0 = без лимита); когда все
+ * варианты выше лимита — откат к общему максимуму; ничья разрешается по bandwidth.
  * Max-quality selection tests (user requirement): the download picks the highest
  * variant not exceeding the cap (targetHeight, 0 = no cap); when every variant is
  * above the cap, it falls back to the overall highest; ties break on bandwidth.
@@ -121,6 +124,9 @@ class SegmentDownloaderTest {
     }
 
     /**
+     * Локальный плейлист задаёт HLS-демузер, который переставляет сегменты на
+     * таймлайн плейлиста. Плейлист должен нести оригинальные длительности EXTINF
+     * (неверная длительность возвращает скачки) и ссылки на скачанные файлы по имени.
      * The local playlist drives the HLS demuxer, which re-bases the segments onto the
      * playlist timeline. It must carry the original EXTINF durations (a wrong
      * duration reintroduces the stutter) and reference the downloaded files by name.
@@ -148,6 +154,7 @@ class SegmentDownloaderTest {
         assertTrue(text.contains("seg000007.ts"));
         assertTrue(text.contains("seg000008.ts"));
         assertTrue(text.endsWith("#EXT-X-ENDLIST\n"));
+        // каждый сегмент должен предваряться своим EXTINF, в порядке плейлиста
         // every segment must be preceded by its EXTINF, in playlist order
         assertTrue(text.indexOf("seg000007.ts") < text.indexOf("seg000008.ts"));
     }
@@ -167,7 +174,8 @@ class SegmentDownloaderTest {
         assertTrue(text.contains("#EXTINF:9.750,"));
     }
 
-    /** The expected length of the stream is the sum of the playlist EXTINF values. */
+    /** Ожидаемая длительность потока = сумма значений EXTINF плейлиста.
+     * The expected length of the stream is the sum of the playlist EXTINF values. */
     @Test
     void expectedDurationSumsExtinf() {
         String media = """
@@ -183,6 +191,8 @@ class SegmentDownloaderTest {
     }
 
     /**
+     * Более короткая склейка означает потерянные сегменты (HLS-демузер открывает
+     * каждый сегмент отдельно) — это должно запустить байтовый фолбэк.
      * A shorter assembled stream means segments were dropped (the HLS demuxer opens
      * every segment separately) — that must trigger the byte-join fallback.
      */
@@ -192,8 +202,10 @@ class SegmentDownloaderTest {
         assertFalse(SegmentDownloader.looksComplete(100.0, 97.0));
         assertTrue(SegmentDownloader.looksComplete(100.0, 100.0));
         assertTrue(SegmentDownloader.looksComplete(100.0, 103.0));
+        // источник с собственными дырами — не наше дело
         // a source that carries its own holes is not our business
         assertTrue(SegmentDownloader.looksComplete(100.0, 112.0));
+        // нет данных -> нет вердикта, фолбэк не запускаем
         // no data -> no verdict, do not trigger a fallback
         assertTrue(SegmentDownloader.looksComplete(0.0, 10.0));
         assertTrue(SegmentDownloader.looksComplete(100.0, -1.0));

@@ -6,6 +6,9 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 /**
+ * Настройки, сохраняемые в %APPDATA%\hlsgrabber\settings.properties (TZ раздел 4.3/6.1):
+ * targetHeight=1080 (CLI фолбэк; GUI использует quality-селектор строки), minSizeBytes,
+ * parallelSegments, downloadDir. UI настроек нет /
  * Settings persisted in %APPDATA%\hlsgrabber\settings.properties (TZ section 4.3/6.1):
  * targetHeight=1080 (CLI fallback; GUI uses the row quality selector), minSizeBytes,
  * parallelSegments, downloadDir. No settings UI.
@@ -13,10 +16,10 @@ import java.util.Properties;
 public class Settings {
 
     public int targetHeight = 1080;
-    public long minSizeBytes = 1048576;       // ~1 MB, TZ 5.1
+    public long minSizeBytes = 1048576;       // ~1 МБ, TZ 5.1 / ~1 MB, TZ 5.1
     public int parallelSegments = 6;          // TZ 6.1
     public String downloadDir;
-    public String userAgent;                  // null = browser default UA
+    public String userAgent;                  // null = UA браузера по умолчанию / null = browser default UA
 
     public static Path settingsFile() {
         String appData = System.getenv("APPDATA");
@@ -63,7 +66,7 @@ public class Settings {
                 p.store(out, "hls-grabber settings");
             }
         } catch (IOException e) {
-            // best-effort persistence
+            // сохранение по мере возможностей / best-effort persistence
         }
     }
 }

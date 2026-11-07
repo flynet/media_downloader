@@ -9,6 +9,10 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
 /**
+ * Главное окно (TZ 5.2): JSplitPane вертикально 40/60 — сверху строки источников,
+ * снизу консоль. Закрытие с активными загрузками запрашивает подтверждение;
+ * загрузки продолжаются в фоне, приложение завершается, когда очередь опустеет
+ * (idle-hook подключён в App).
  * Main window (TZ 5.2): JSplitPane vertical 40/60 — source rows on top, console below.
  * Closing with active downloads asks for confirmation; downloads continue in background,
  * the app exits when the queue drains (idle hook wired in App).
@@ -16,7 +20,7 @@ import java.awt.event.WindowEvent;
 public final class MainWindow extends JFrame {
 
     public MainWindow(SourceListPanel list, LogPanel logPanel, Settings settings, DownloadQueue queue) {
-        super("HLS Grabber — папка: " + settings.downloadDir);
+        super("HLS Grabber — папка / folder: " + settings.downloadDir);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, list, logPanel);
@@ -33,7 +37,9 @@ public final class MainWindow extends JFrame {
                 if (queue.hasActiveTasks()) {
                     int r = JOptionPane.showConfirmDialog(MainWindow.this,
                             "Выполняются загрузки. Закрыть окно? Загрузки продолжатся, "
-                                    + "приложение завершится, когда очередь опустеет.",
+                                    + "приложение завершится, когда очередь опустеет. "
+                                    + "/ Downloads in progress. Close the window? Downloads "
+                                    + "continue; the app exits when the queue drains.",
                             "HLS Grabber", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
                     if (r != JOptionPane.YES_OPTION) {
                         return;

@@ -24,6 +24,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
+ * Конвейер загрузки HLS (TZ 6.2): загрузка манифеста, выбор варианта, init-сегмент
+ * первым, сегменты (параллельно, resume, retry, нарезка byterange), дешифрование
+ * AES-128, аудиодорожка, FFmpeg concat/mux.
  * HLS download pipeline (TZ 6.2): fetch manifest, pick variant, init segment first,
  * segments (parallel, resume, retry, byterange slice), AES-128 decrypt, audio track,
  * FFmpeg concat/mux.
@@ -55,6 +58,11 @@ public class SegmentDownloader {
     }
 
     /**
+     * Разрешение URL для загрузки: приоритет подписанному URL, запрошенному браузером
+     * и записанному sniffером (ключ = имя файла ссылки); короткий опрос поздних
+     * событий (бразер запрашивает сегменты по мере воспроизведения); фолбэк —
+     * конструирование. Подписи phncdn уникальны по пути: сконструированный URL
+     * даёт HTTP 500.
      * Resolve a URL for fetching: prefer the browser-requested signed URL recorded by
      * the sniffer (key = filename of the reference); poll briefly for late events
      * (browser requests segments as playback progresses); fall back to construction.
@@ -68,6 +76,10 @@ public class SegmentDownloader {
             }
         }
         String constructed = UrlUtils.resolve(base, ref);
+        // CDN с подписью, привязанной к пути (phncdn), отклоняют сконструированные
+        // URL (4xx/500): тогда опрашиваем записанный подписанный URL. Сайты без
+        // подписи (123av) отдают сконструированные URL нормально, поэтому сначала
+        // пробуем GET-range, чтобы не опрашивать по 45 с на каждый сегмент.
         // signature-bound CDNs (phncdn) reject constructed URLs (4xx/500): poll the
         // recorded signed URL then. Unsigned sites (123av) serve constructed URLs
         // fine, so probe GET-range first to avoid a 45 s poll per segment.
@@ -105,7 +117,8 @@ public class SegmentDownloader {
         return null;
     }
 
-    /** Recorded map key: filename of a reference (last path segment, no query). */
+    /** Ключ карты записей: имя файла ссылки (последний сегмент пути, без query).
+     * Recorded map key: filename of a reference (last path segment, no query). */
     private static String recordedKey(String ref) {
         String key = UrlUtils.lastSegment(ref);
         return key.isEmpty() ? ref : key;
@@ -115,16 +128,20 @@ public class SegmentDownloader {
         return new String(fetcher.get(url), java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    /** Cooperative cancel: stops the segment loop; a running FFmpeg is not killed. */
+    /** Кооперативная отмена: останавливает цикл сегментов; запущенный FFmpeg не убивается.
+     * Cooperative cancel: stops the segment loop; a running FFmpeg is not killed. */
     public void cancel() {
         this.cancelled = true;
     }
 
     /**
+     * Скачивание мастер-плейлиста: выбор варианта 1080p (TZ 5.2.3), скачивание видео,
+     * опционального аудио, мультиплексирование, запись финального mp4 в {@code outDir}.
      * Download a master playlist: select 1080p variant (TZ 5.2.3), download video,
      * optional audio, mux, write final mp4 into {@code outDir}.
      *
-     * @return final file path; temp task dir removed on success, kept on failure.
+     * @return финальный путь к файлу; временная папка задачи удаляется при успехе,
+     * сохраняется при отказе. / final file path; temp task dir removed on success, kept on failure.
      */
     public Path runMaster(String masterUrl, Path outDir, String name, int targetHeight)
             throws Exception {
@@ -135,7 +152,8 @@ public class SegmentDownloader {
         return runMasterText(text, masterUrl, outDir, name, targetHeight);
     }
 
-    /** Master playlist fetch: recorded signed URL by filename key when known. */
+    /** Загрузка мастер-плейлиста: подписанный записанный URL по ключу-имени файла, когда известен.
+     * Master playlist fetch: recorded signed URL by filename key when known. */
     private String resolveMasterFetch(String masterUrl) {
         String key = UrlUtils.lastSegment(UrlUtils.canonicalize(masterUrl));
         if (record != null) {
@@ -218,7 +236,8 @@ public class SegmentDownloader {
         return finalFile;
     }
 
-    /** Download one media playlist (segments + init + key + concat) into taskDir. */
+    /** Скачивание одного медиа-плейлиста (сегменты + init + ключ + склейка) в taskDir.
+     * Download one media playlist (segments + init + key + concat) into taskDir. */
     private Path downloadStream(MediaPlaylist media, String mediaUrl, Path taskDir)
             throws Exception {
         KeyInfo key = media.playlistKey();
@@ -246,6 +265,8 @@ public class SegmentDownloader {
         List<Path> files = new ArrayList<>();
         long bytes = 0;
         int total = media.segments().size();
+        // CMAF/fMP4 медиа-плейлист (стиль phncdn): #EXT-X-MAP init + moof/mdat фрагменты.
+        // Concat-демуксер не читает moof/mdat .m4s: результат — файл только с заголовком.
         // CMAF/fMP4 media playlist (phncdn style): #EXT-X-MAP init + moof/mdat fragments.
         // The concat demuxer cannot read moof/mdat .m4s: its result is a header-only file.
         boolean cmaf = media.mapUri() != null;
@@ -264,6 +285,7 @@ public class SegmentDownloader {
         log.info("Сегментов: {}", total);
         List<Future<Path>> futures = new ArrayList<>();
         ExecutorService pool = Executors.newFixedThreadPool(parallel);
+        // Кэш по каждому удалённому файлу для нарезки byterange
         // per-remote-file cache for byterange slicing
         Map<String, byte[]> fileCache = new HashMap<>();
         int done = 0;
@@ -274,7 +296,7 @@ public class SegmentDownloader {
                     String url = resolveUrl(seg.rawUri(), mediaUrl, recordedKey(seg.rawUri()));
                     Path local = taskDir.resolve(String.format("seg%06d%s", seg.sequence(), segExt));
                     if (Files.exists(local) && Files.size(local) > 0) {
-                        return local; // resume: already downloaded
+                        return local; // возобновление: уже скачано / resume: already downloaded
                     }
                     byte[] body = fetchSegment(url, seg, fileCache);
                     byte[] plain = dec != null
@@ -305,6 +327,9 @@ public class SegmentDownloader {
 
         Path stream = taskDir.resolve("stream.mp4");
         if (cmaf) {
+            // Побайтовая склейка init + сегментов в порядке плейлиста, затем remux
+            // фрагментированного потока в стандартный играбельный mp4: concat-демуксер
+            // отбрасывает moof/mdat-фрагменты.
             // byte-concat init + segments in playlist order, then remux the fragmented
             // stream into a standard playable mp4. concat demuxer drops moof/mdat fragments.
             Path raw = taskDir.resolve("raw.mp4");
@@ -323,6 +348,11 @@ public class SegmentDownloader {
             checkAssembled(stream, bytes);
             return stream;
         }
+        // MPEG-TS: сборка через HLS-демуксер поверх локального плейлиста. HLS-демуксер
+        // раскладывает сегменты по таймлайну плейлиста (ровно то, что делает HLS-плеер),
+        // тогда как concat-демуксер перебазирует каждый файл по его собственной оценке
+        // длительности и оставляет дыру ~0.1-0.2 с на каждой границе сегмента —
+        // файл тогда идёт рывками и примерно на 2.5 % длиннее контента.
         // MPEG-TS: assemble through the HLS demuxer over a local playlist. The HLS
         // demuxer lays the segments onto the playlist timeline (exactly what an HLS
         // player does), while the concat demuxer re-bases every file by its own
@@ -337,6 +367,10 @@ public class SegmentDownloader {
                 log.debug("склейка: {}", line);
             }
         });
+        // Страховка: HLS-демуксер открывает каждый сегмент как отдельный вход, поэтому
+        // сайт, чьи сегменты не содержат собственных PAT/PMT, их теряет. Если результат
+        // короче заявленного в плейлисте, откат на сборку байтовой склейкой — она
+        // работает для любого MPEG-TS и сохраняет исходные таймстампы.
         // Safety net: the HLS demuxer opens every segment as a separate input, so a site
         // whose segments carry no PAT/PMT of their own would lose them. If the result is
         // shorter than the playlist declares, fall back to the byte-join assembly, which
@@ -355,6 +389,8 @@ public class SegmentDownloader {
             });
             double joinedActual = ffmpeg.duration(stream);
             if (!looksComplete(expected, joinedActual)) {
+                // Значения EXTINF плейлиста могут быть просто неточными — это не причина
+                // браковать скачивание, которое раньше проходило; сообщаем и продолжаем.
                 // The playlist's EXTINF values may simply be inaccurate — that is not a
                 // reason to fail a download that used to succeed; report and continue.
                 log.warn("Собранный поток ({} с) короче суммы EXTINF ({} с) — "
@@ -365,7 +401,8 @@ public class SegmentDownloader {
         return stream;
     }
 
-    /** Sum of the #EXTINF durations of the playlist — the expected length of the stream. */
+    /** Сумма длительностей #EXTINF плейлиста — ожидаемая длина потока.
+     * Sum of the #EXTINF durations of the playlist — the expected length of the stream. */
     static double expectedDuration(MediaPlaylist media) {
         double sum = 0;
         for (Segment s : media.segments()) {
@@ -375,6 +412,9 @@ public class SegmentDownloader {
     }
 
     /**
+     * Собранный поток такой длины, как заявляет плейлист? Более короткий результат
+     * означает, что сегменты потеряны (сегмент не читается отдельно); более длинный
+     * допускается — источник сам может содержать дыры, прятать их не наша задача.
      * Is the assembled stream as long as the playlist declares? A shorter result means
      * segments were dropped (unreadable standalone segment); a longer one is allowed —
      * the source itself may carry holes, and hiding them is not our job.
@@ -386,7 +426,8 @@ public class SegmentDownloader {
         return actualSec >= expectedSec * 0.98;
     }
 
-    /** Byte-joins the downloaded segments into one MPEG-TS stream (fallback assembly). */
+    /** Байтовая склейка скачанных сегментов в один MPEG-TS поток (запасная сборка).
+     * Byte-joins the downloaded segments into one MPEG-TS stream (fallback assembly). */
     private static void joinBytes(List<Path> files, Path out) throws IOException {
         try (OutputStream os = new BufferedOutputStream(Files.newOutputStream(out))) {
             for (Path p : files) {
@@ -396,6 +437,10 @@ public class SegmentDownloader {
     }
 
     /**
+     * Локальный HLS медиа-плейлист поверх уже скачанных сегментов (относительные
+     * имена: плейлист лежит в той же папке). Сохраняет исходные длительности #EXTINF,
+     * чтобы HLS-демуксер воспроизвёл исходный таймлайн без дыр.
+     * package-private для модульных тестов.
      * Local HLS media playlist over the already downloaded segments (relative names:
      * the playlist lives in the same directory). Keeps the original #EXTINF durations
      * so the HLS demuxer reproduces the source timeline without holes.
@@ -446,6 +491,9 @@ public class SegmentDownloader {
     }
 
     /**
+     * Расширение пути URI сегмента (query/fragment сняты); def, когда путь не содержит
+     * пригодного расширения. phncdn отдаёт фрагменты ".m4s", 123av — ".ts".
+     * package-private для модульных тестов.
      * Extension of a segment URI path (query/fragment stripped); def when the path
      * carries no usable extension. phncdn serves ".m4s" fragments, 123av serves ".ts".
      * package-private for unit testing.
@@ -477,6 +525,10 @@ public class SegmentDownloader {
     }
 
     /**
+     * Честный отказ при сборке «только заголовок»: когда результат — крошечная доля
+     * скачанных байт сегментов, путь concat/remux молча потерял полезную нагрузку
+     * (concat-демуксер поверх moof/mdat-фрагментов), поэтому задача не должна
+     * рапортовать успех с неиграбельным файлом из одного заголовка.
      * Honest failure for header-only assembly: when the produced stream is a tiny
      * fraction of the downloaded segment bytes, the concat/remux path silently dropped
      * the payload (concat demuxer over moof/mdat fragments), so the task must not
@@ -490,7 +542,8 @@ public class SegmentDownloader {
         }
     }
 
-    /** #EXT-X-BYTERANGE: "len" or "len@offset" (TZ 6.2). */
+    /** #EXT-X-BYTERANGE: "len" или "len@offset" (TZ 6.2) — вырезка из скачанного файла.
+     * #EXT-X-BYTERANGE: "len" or "len@offset" (TZ 6.2). */
     static byte[] slice(byte[] full, String byteRange) {
         String[] parts = byteRange.split("@");
         int len = Integer.parseInt(parts[0].trim());
@@ -499,6 +552,10 @@ public class SegmentDownloader {
     }
 
     /**
+     * Выбор максимального качества (требование пользователя): наивысший вариант, не
+     * превышающий лимит (targetHeight, 0 = без лимита); когда все варианты выше лимита,
+     * откат на наивысший из всех. null только когда мастер не содержит пригодных
+     * (с указанным height) вариантов. package-private для модульных тестов.
      * Max-quality selection (user requirement): highest variant not exceeding the cap
      * (targetHeight, 0 = no cap); when every variant is above the cap, fall back to the
      * overall highest. null only when the master carries no usable (heighted) variant.
@@ -509,11 +566,15 @@ public class SegmentDownloader {
         if (best != null) {
             return best;
         }
+        // лимит ниже всех вариантов: берём лучшее доступное качество
         // cap below every variant: take the best available quality
         return pickCap(master, 0);
     }
 
     /**
+     * Наивысший вариант с height &lt;= cap (cap 0 = без лимита), ничьи разрешаются по
+     * bandwidth. Высоты сравниваются как int: Integer == Integer сравнивает ссылки для
+     * значений вне кэша -128..127, что молча ломает разрешение ничьих по bandwidth.
      * Highest variant with height <= cap (cap 0 = no cap), ties broken on bandwidth.
      * Heights compared as int: Integer == Integer compares references for values
      * outside the -128..127 cache, which silently kills the bandwidth tie-break.
@@ -560,6 +621,7 @@ public class SegmentDownloader {
                 Files.deleteIfExists(p);
             }
         }
+        // родитель .tmp не должен засорять папку загрузок после успешного запуска
         // the .tmp parent must not litter the downloads folder after a successful run
         Path base = taskDir.getParent();
         if (base != null && ".tmp".equals(String.valueOf(base.getFileName()))) {
@@ -574,7 +636,8 @@ public class SegmentDownloader {
         }
     }
 
-    /** Sentinel for filters that skip the source (live/DRM/no-1080p). */
+    /** Сентинел для фильтров, пропускающих источник (live/DRM/нет 1080p).
+     * Sentinel for filters that skip the source (live/DRM/no-1080p). */
     public static class SkipException extends Exception {
         public SkipException(String msg) {
             super(msg);
