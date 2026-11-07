@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="hlsdir" value="${hlsdir:-.}"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%d{HH:mm:ss}] %-5level %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- TZ section 2: file appender into the downloads folder -->
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${hlsdir}/hlsgrabber.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>[%d{HH:mm:ss}] %-5level %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- TZ section 5.2: GUI console appender, sink wired by App.runGui -->
+    <appender name="GUI" class="com.example.hlsgrabber.ui.SwingLogAppender"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="GUI"/>
+    </root>
+
+</configuration>
