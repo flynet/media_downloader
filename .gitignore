@@ -1,42 +1,27 @@
+# --- Build output -----------------------------------------------------------
 target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-.kotlin
-/hlsgrabber.log
-/tmp/
-**/.stand-profile/
+appimage/
+*.jar
+!Downloader_hub/.mvn/wrapper/maven-wrapper.jar
 
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
+# --- Generated archives and logs --------------------------------------------
+*.zip
+*.log
 
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
+# --- IDE --------------------------------------------------------------------
+.idea/
 .vscode/
+*.iml
 
-### Mac OS ###
-.DS_Store
+# --- Local experiments and scratch space ------------------------------------
+# anchored to the repo root: src/docs/spikes/ (spike reports) must stay tracked
+/spikes/
+/tmp/
+
+# --- Browser profiles (Playwright / Chrome) ---------------------------------
+**/.stand-profile/
+**/.e2e-profile/
+**/.probe-profile*/
+**/.repro-*/
+**/.profile/
+**/profile/
