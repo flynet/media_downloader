@@ -5,7 +5,9 @@ rem =====================================================================
 rem  HLS Grabber - full build -> app-image .exe -> launch GUI
 rem  Steps: 1) mvn clean package  2) jlink runtime  3) jpackage app-image
 rem         4) bundle Playwright browsers  5) launch GUI
-rem  Paths are relative to this script. Edit JAVA_HOME/MAVEN_CMD below if needed.
+rem  Requires: JDK 21 (Temurin) and Maven 3.9+, Windows x64.
+rem  Edit JDK=/MAVEN_CMD below to point to YOUR install (paths here are the
+rem  author's). See README section "Сборка из исходников" / "Building from source".
 rem =====================================================================
 
 set "ROOT=%~dp0"
@@ -15,6 +17,24 @@ set "MAVEN_CMD=C:\mvn\bin\mvn.cmd"
 
 set "HUB=%ROOT%Downloader_hub"
 set "APP=%ROOT%appimage"
+
+rem ---- Requirement checks (friendly, before any build work) ----
+if not exist "%JDK%\bin\jlink.exe" (
+  echo ERROR: JDK 21 not found at "%JDK%".
+  echo Install it, e.g.:  winget install EclipseAdoptium.Temurin.21.JDK
+  echo Then set the JDK= path at the top of this script to your install.
+  goto :fail
+)
+if not exist "%MAVEN_CMD%" (
+  echo ERROR: Maven not found at "%MAVEN_CMD%".
+  echo Download "apache-maven-3.x-bin.zip" from https://maven.apache.org/download.cgi
+  echo Extract it ^(e.g. to C:\mvn^), then set MAVEN_CMD= at the top of this script.
+  goto :fail
+)
+"%JDK%\bin\java" -version 2>&1 | findstr /C:"21." >nul || (
+  echo ERROR: the JDK at "%JDK%" is not version 21. This build needs JDK 21.
+  goto :fail
+)
 
 echo [1/5] Maven clean package...
 call "%MAVEN_CMD%" -f "%HUB%\pom.xml" clean package

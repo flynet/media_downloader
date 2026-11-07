@@ -55,13 +55,36 @@ SHA256 `HLS-Grabber-1.0.0-windows-x64.zip`:
 
 ## Сборка из исходников
 
+> Сборка нужна только если вы хотите изменить код и получить свой `exe`.
+> Готовый exe лежит в **[Releases](https://github.com/flynet/media_downloader/releases/latest)** — для запуска
+> ничего устанавливать не нужно (Java входит в сборку).
+
 ### Требования
 
-| Компонент | Версия |
-|---|---|
-| JDK | 21 (Temurin / OpenJDK), используется `jlink` и `jpackage` |
-| Maven | 3.9+ |
-| ОС | Windows x64 (FFmpeg подтягивается только под `windows-x86_64`) |
+| Компонент | Версия | Как установить |
+|---|---|---|
+| JDK | 21 (нужны `jlink` и `jpackage`) | `winget install EclipseAdoptium.Temurin.21.JDK` |
+| Maven | 3.9+ | нет пакета winget: скачайте `apache-maven-3.x-bin.zip` с [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) и распакуйте, например в `C:\mvn` |
+| ОС | Windows x64 | FFmpeg подтягивается Maven-ом только под `windows-x86_64` |
+
+Проверка установленных версий:
+
+```powershell
+& "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\bin\java" -version   # должна быть 21
+C:\mvn\bin\mvn.cmd -version                                                       # 3.9+
+```
+
+### Пути в скрипте
+
+В начале `build_appimage.bat` прописаны пути автора:
+
+```bat
+set "JDK=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+set "MAVEN_CMD=C:\mvn\bin\mvn.cmd"
+```
+
+**Замените их на свои** — на пути из этих строк скрипт ссылается буквально, и при запуске
+сразу сообщает, чего не хватает (сообщение с подсказкой установки), ещё до начала сборки.
 
 ### Команды
 
@@ -99,18 +122,9 @@ Downloader_hub/      Java-проект (Maven, один модуль)
     youtube/         поддержка YouTube
     ui/              Swing-GUI
   src/test/          unit- и E2E-тесты
-  src/docs/          ТЗ, план и статус проекта
 build_appimage.bat   сборка Windows-версии (.exe)
 .github/             служебные хуки (OpenRewrite java-upgrade)
 ```
-
----
-
-## Документация проекта
-
-- [`src/docs/TZ_HLS_Grabber.md`](Downloader_hub/src/docs/TZ_HLS_Grabber.md) — техническое задание (v4).
-- [`src/docs/PLAN_HLS_Grabber.md`](Downloader_hub/src/docs/PLAN_HLS_Grabber.md) — план работ по этапам.
-- [`src/docs/STATUS_HLS_Grabber.md`](Downloader_hub/src/docs/STATUS_HLS_Grabber.md) — текущее состояние.
 
 ---
 

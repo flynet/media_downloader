@@ -14,7 +14,9 @@ appimage/
 *.iml
 
 # --- Local experiments and scratch space ------------------------------------
-# anchored to the repo root: src/docs/spikes/ (spike reports) must stay tracked
+# agent-facing project docs (ТЗ, план, статус, spike-отчёты): keep them local,
+# they are not part of the public repo
+Downloader_hub/src/docs/
 /spikes/
 /tmp/
 
