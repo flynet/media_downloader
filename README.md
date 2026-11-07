@@ -18,12 +18,12 @@ The latest build is always in the **[Releases](https://github.com/flynet/media_d
 
 | Version | File | Size | Date |
 |---|---|---|---|
-| **v1.0.0** | [**HLS-Grabber-1.0.0-windows-x64.zip**](https://github.com/flynet/media_downloader/releases/download/v1.0.0/HLS-Grabber-1.0.0-windows-x64.zip) | ~592 MB | 07.11.2026 |
+| **v1.0.0** | [**HLS-Grabber-1.0.0-windows-x64.zip**](https://github.com/flynet/media_downloader/releases/download/v1.0.0/HLS-Grabber-1.0.0-windows-x64.zip) | ~592 MB | 08.11.2026 |
 
 SHA256 `HLS-Grabber-1.0.0-windows-x64.zip`:
 
 ```
-98f6416ae5a948972063cb4db137c2edd612ae8256c33ab866a176eb064ed627
+34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc
 ```
 
 ### How to install
@@ -63,7 +63,7 @@ SHA256 `HLS-Grabber-1.0.0-windows-x64.zip`:
 |---|---|---|
 | JDK | 21 (`jlink` and `jpackage` are required) | `winget install EclipseAdoptium.Temurin.21.JDK` |
 | Maven | 3.9+ | no winget package: download `apache-maven-3.x-bin.zip` from [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) and unpack, e.g. into `C:\mvn` |
-| OS | Windows x64 | FFmpeg is pulled by Maven for `windows-x64` only |
+| OS | Windows x64 | FFmpeg is pulled by Maven for `windows-x86_64` only |
 
 Check the installed versions:
 
@@ -143,7 +143,7 @@ The code is distributed “as is”. Contact the author before using it in your 
 **Релизы.** Актуальная сборка — в разделе
 **[Releases](https://github.com/flynet/media_downloader/releases/latest)**: **v1.0.0**,
 `HLS-Grabber-1.0.0-windows-x64.zip` (~592 МБ), SHA256
-`98f6416ae5a948972063cb4db137c2edd612ae8256c33ab866a176eb064ed627`.
+`34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc`.
 
 **Установка.** Скачайте zip, распакуйте в любую папку (потребуется ~1.5 ГБ), запустите
 **`HLS Grabber.exe`** из папки `HLS Grabber`, выберите папку загрузок. Файл не подписан:
