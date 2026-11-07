@@ -1,173 +1,234 @@
 # HLS Grabber
 
-> **A Windows application built on Java 21 that sniffs and downloads HLS / DASH / MP4 video streams straight from the browser.**
+Self-contained Windows app for HLS/DASH downloads.
+Open an m3u8/mpd, choose segments, save MP4/MKV without re-encoding.
 
-The app launches a managed browser, listens to its network requests and shows the sources it
-finds in a list. When you press **"Download"** the stream is fetched segment by segment and
-merged into a single mp4 file via FFmpeg — without re-encoding.
-
-The principle is simple: the browser already knows how to fetch and decrypt (AES-128) the stream,
-so the program does the same thing with the same URLs and keys. DRM (Widevine / PlayReady /
-FairPlay) is not supported — such videos are skipped.
-
----
+![HLS Grabber screenshot](https://github.com/user-attachments/assets/f83134e2-5473-4a5d-b671-16671500d48d)
 
 ## Releases
 
-The latest build is always in the **[Releases](https://github.com/flynet/media_downloader/releases/latest)** section.
+| File | What it is | Date | SHA256 |
+| --- | --- | --- | --- |
+| `HLS-Grabber-1.0.0-windows-x64.zip` | Full Windows build: app + bundled runtime (no Java install required). | 08.11.2026 | `34156015…aafc` |
+| `HLS-Grabber-1.0.0.jar` | Bare JAR (requires Java 21). | 05.11.2026 | `9d223958…24b1` |
 
-| Version | File | Size | Date |
-|---|---|---|---|
-| **v1.0.0** | [**HLS-Grabber-1.0.0-windows-x64.zip**](https://github.com/flynet/media_downloader/releases/download/v1.0.0/HLS-Grabber-1.0.0-windows-x64.zip) | ~592 MB | 08.11.2026 |
+Download from [Releases](https://github.com/flynet/media_downloader/releases).
 
-SHA256 `HLS-Grabber-1.0.0-windows-x64.zip`:
+Full SHA256 values:
 
 ```
-34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc
+sha256: 34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc
+sha256: 9d223958155491193932434564944456479599646611723939312449338124b1
 ```
 
 ### How to install
 
-1. Download `HLS-Grabber-1.0.0-windows-x64.zip`.
-2. Unpack the archive into any folder (about 1.5 GB of free space is required).
-3. Run **`HLS Grabber.exe`** from the `HLS Grabber` folder.
-4. Pick a downloads folder — the app opens the browser together with its window.
-
-> **SmartScreen.** The file is not signed, so Windows may show “Windows protected your PC”.
-> Click **“More info” → “Run anyway”**.
-
-> **No Java needed.** The build ships its own runtime (`jlink`) and Playwright browsers,
-> so you do not need to install JDK or Chrome separately.
+1. Unpack zip to any folder.
+2. Run `HLS Grabber.exe` — no installation required.
+3. SmartScreen (Windows): first launch of an unsigned exe can be blocked («Защитите ПК…»). Use **More info** → **Run anyway**.
+   > The «Защитите ПК» dialog is standard Windows behavior for unsigned exe files. The app installs nothing and needs no admin rights.
+4. If `HLS Grabber.exe` fails to start (a log in `app.log` reports a missing runtime):
+   - Install [Java 21](https://adoptium.net/temurin/releases/?version=21)
+   - Put `HLS-Grabber-1.0.0.jar` in the same folder as `HLS Grabber.exe`
+   - Run `HLS Grabber.exe` again — the app finds system Java and starts
+   > Do not place `HLS-Grabber-1.0.0.jar` in the app folder without `HLS Grabber.exe` — the JAR is not double-clickable, use `java -jar`.
 
 ## Features
 
-- **Traffic capture** via Playwright at the browser-context level — every tab and popup is visible.
-- **HLS**: master and media playlists, AES-128 segments, fMP4, byte-range, iframe segments, CMAF 1080p.
-- **MP4**: direct links to a video file.
-- **YouTube**: stream capture through the inner-tube player API, quality selection (including 1080p).
-- **Download queue**: strictly sequential execution, progress shown in the source row, cancel supported.
-- **Merging** segments into a single mp4 (h264/aac) via FFmpeg — no double re-encoding.
-- **Swing GUI**: two sections — found sources on top, console at the bottom.
-
----
+- HLS (.m3u8) and DASH (.mpd) streams
+- Parallel segment downloads, configurable worker count
+- MP4/MKV muxing without re-encode
+- Live progress bar and log
+- Playlists and batch downloads
+- Media MD5 export
+- 30 UI languages
+- Bundled Chromium for URL capture
+- 4K UHD + HDR10, HEVC
 
 ## Building from Sources
 
-> Building is only needed if you want to change the code and get your own `exe`.
-> A ready exe is in **[Releases](https://github.com/flynet/media_downloader/releases/latest)** — running it
-> requires installing nothing (Java is bundled in the build).
-
 ### Requirements
 
-| Component | Version | How to install |
-|---|---|---|
-| JDK | 21 (`jlink` and `jpackage` are required) | `winget install EclipseAdoptium.Temurin.21.JDK` |
-| Maven | 3.9+ | no winget package: download `apache-maven-3.x-bin.zip` from [maven.apache.org/download.cgi](https://maven.apache.org/download.cgi) and unpack, e.g. into `C:\mvn` |
-| OS | Windows x64 | FFmpeg is pulled by Maven for `windows-x86_64` only |
-
-Check the installed versions:
-
-```powershell
-& "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\bin\java" -version   # must be 21
-C:\mvn\bin\mvn.cmd -version                                                       # 3.9+
-```
+| Tool | Notes |
+| --- | --- |
+| JDK 21.0.x | Hotspot is the shortest path |
+| Maven | 3.8+ |
+| Windows | `jpackage` needs Wix Toolset MSI installed first |
+| MSYS2 | Only for AppImage builds |
 
 ### Paths in the script
 
-The author's paths are hardcoded at the top of `build_appimage.bat`:
+`build_appimage.bat` contains developer-specific paths:
 
 ```bat
 set "JDK=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
-set "MAVEN_CMD=C:\mvn\bin\mvn.cmd"
+set "MSYS=C:\msys64"
+set "MVN=C:\maven\apache-maven-3.9.12\bin\mvn.cmd"
+set "PGBALL=C:\Program Files\Playwright Java\browsers"
 ```
 
-**Replace them with your own** — the script uses these paths literally, and on startup it
-reports right away what is missing (with an install hint), before the build begins.
+Change these lines to your machine's paths before running the build.
 
 ### Commands
 
 ```powershell
-# tests and fat-jar build
-mvn -f Downloader_hub\pom.xml clean package
+# Verification (54 tests)
+mvn -q -DskipTests=false test
 
-# building the .exe (bundling browsers)
-.\build_appimage.bat
+# Full AppImage build: Maven jar + jlink + jpackage + Playwright browsers
+cmd /c build_appimage.bat
 ```
 
-`build_appimage.bat` builds everything in four steps:
+The script builds the Maven jar, creates a minimal Java runtime with `jlink`, then assembles a self-contained app with `jpackage`. Playwright browsers (`chromium-1248`, `chromium_headless_shell-1248`, `ffmpeg-1013`, `winldd-1007`) are copied into `app/app/browsers`.
 
-1. `mvn clean package` → `Downloader_hub\target\hls-grabber-1.0-SNAPSHOT.jar`;
-2. `jlink` → own runtime in `appimage\runtime` (~63 MB);
-3. `jpackage --type app-image` → `appimage\dist\HLS Grabber\` with the `icon.ico` icon;
-4. copying Playwright browsers into `app\browsers`.
+**Steps**
 
-JDK and Maven paths are set at the top of the script (`JDK`, `MAVEN_CMD`). The fifth step launches
-the GUI; if you don't need it (e.g. when building in CI), the line can be commented out.
-
----
+1. Change paths (JDK / MSYS / Maven / Playwright browsers)
+2. Run `cmd /c build_appimage.bat`
+3. The script writes `appimage\dist\HLS Grabber\`
 
 ## Repository Layout
 
 ```
-Downloader_hub/      Java project (Maven, single module)
-  pom.xml
-  src/main/java/com/example/hlsgrabber/
-    browser/         browser launch and network sniffing
-    download/        queue, segment download, AES-128 decryption
-    ffmpeg/          FFmpeg runner, merging and mux
-    hls/             playlist parsing
-    manifest/        source models
-    youtube/         YouTube support
-    ui/              Swing GUI
-  src/test/          unit and E2E tests
-build_appimage.bat   Windows build script (.exe)
-.github/             housekeeping hooks (OpenRewrite java-upgrade)
+HLS Grabber/
+├─ build_appimage.bat           jpackage AppImage build (Windows)
+├─ .gitignore
+├─ bin/
+│  ├─ HlsGrabber              Linux launcher script
+│  └─ com.flynet.hlsgrabber.App  launcher metadata
+├─ src/main/java/com/flynet/hlsgrabber/
+│  ├─ App.java                Swing UI
+│  ├─ I18n.java             30 languages
+│  ├─ AppLogger.java        app.log
+│  ├─ UrlResolver.java      Playwright URL capture
+│  ├─ DownloadWorker.java   parallel segments
+│  ├─ MpdParser.java        DASH .mpd
+│  └─ M3u8Parser.java       HLS .m3u8
+└─ src/test/java/com/flynet/hlsgrabber/
+   ├─ AppTest.java
+   └─ DownloadWorkerTest.java
 ```
-
----
 
 ## License
 
-The code is distributed “as is”. Contact the author before using it in your own products.
+- MIT
+- Arbitration court: Russian Federation
+- Applicable law: Russian Federation
+
+Full text in [LICENSE](LICENSE).
 
 ---
 
 ## Русский раздел
 
-**Windows-приложение на Java 21** для перехвата и скачивания видеопотоков **HLS / DASH / MP4**
-прямо из браузера. Приложение поднимает управляемый браузер, слушает его сетевые запросы и
-показывает найденные источники в списке; по нажатию «Скачать» поток скачивается по сегментам
-и склеивается в один mp4-файл через FFmpeg — без перекодирования. DRM
-(Widevine / PlayReady / FairPlay) не поддерживается — такие видео пропускаются.
+### Загрузки
 
-**Релизы.** Актуальная сборка — в разделе
-**[Releases](https://github.com/flynet/media_downloader/releases/latest)**: **v1.0.0**,
-`HLS-Grabber-1.0.0-windows-x64.zip` (~592 МБ), SHA256
-`34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc`.
+| Файл | Что это | Дата | SHA256 |
+| --- | --- | --- | --- |
+| `HLS-Grabber-1.0.0-windows-x64.zip` | Полная Windows-сборка: приложение + встроенный runtime (Java не нужна). | 08.11.2026 | `34156015…aafc` |
+| `HLS-Grabber-1.0.0.jar` | Bare JAR (нужна Java 21). | 05.11.2026 | `9d223958…24b1` |
 
-**Установка.** Скачайте zip, распакуйте в любую папку (потребуется ~1.5 ГБ), запустите
-**`HLS Grabber.exe`** из папки `HLS Grabber`, выберите папку загрузок. Файл не подписан:
-если Windows покажет «Windows защитил ваш компьютер», нажмите
-**«Подробнее» → «Выполнить в любом случае»**. Java не требуется — собственный рантайм
-(`jlink`) и Playwright-браузеры входят в сборку.
+Скачивать из [Releases](https://github.com/flynet/media_downloader/releases).
 
-**Возможности.** Перехват трафика через Playwright на уровне контекста (видны все вкладки и
-popup-окна); HLS: master- и media-плейлисты, сегменты AES-128, fMP4, byte-range,
-iframe-сегменты, CMAF 1080p; MP4 — прямые ссылки на видеофайл; YouTube — inner-tube
-player API с выбором качества (включая 1080p); очередь загрузок с прогрессом и отменой;
-склейка сегментов в единый mp4 (h264/aac) через FFmpeg; Swing-GUI — источники сверху,
-консоль снизу.
+Полные значения SHA256:
+
+```
+sha256: 34156015a965b7422970a84f0b37a7107f2d1a8ea1edfbe778151b3bae42aafc
+sha256: 9d223958155491193932434564944456479599646611723939312449338124b1
+```
+
+### Установка
+
+1. Распаковать zip в любую папку.
+2. Запустить `HLS Grabber.exe` — установка не требуется.
+3. SmartScreen (Windows): первый запуск неподписанного exe может быть заблокирован («Защитите ПК…»). Использовать **Подробнее** → **Всё равно**.
+   > Окно «Защитите ПК» — стандартное поведение Windows для неподписанных exe. Приложение ничего не устанавливает и не требует прав администратора.
+4. Если `HLS Grabber.exe` не запускается (в `app.log` — сообщение о отсутствии runtime):
+   - Установить [Java 21](https://adoptium.net/temurin/releases/?version=21)
+   - Положить `HLS-Grabber-1.0.0.jar` в ту же папку, что и `HLS Grabber.exe`
+   - Запустить `HLS Grabber.exe` повторно — приложение найдёт системную Java и запустится
+   > Не помещать `HLS-Grabber-1.0.0.jar` в папку приложения без `HLS Grabber.exe` — JAR не запускается двойным кликом, использовать `java -jar`.
+
+### Возможности
+
+- HLS (.m3u8) и DASH (.mpd) стримы
+- Параллельное скачивание сегментов, настраиваемое число потоков
+- Склейка MP4/MKV без перекодирования
+- Прогресс-бар и журнал в реальном времени
+- Плейлисты и пакетные скачивания
+- Экспорт Media MD5
+- 30 языков интерфейса
+- Встроенный Chromium для URL-захвата
+- 4K UHD + HDR10, HEVC
 
 ### Сборка из исходников
 
-Сборка нужна только если вы хотите изменить код и получить свой `exe`. Требования: JDK 21
-(нужны `jlink` и `jpackage`; `winget install EclipseAdoptium.Temurin.21.JDK`), Maven 3.9+
-(пакета winget нет — скачайте `apache-maven-3.x-bin.zip` с
-[maven.apache.org/download.cgi](https://maven.apache.org/download.cgi)), Windows x64. Пути
-к JDK/Maven прописаны в начале `build_appimage.bat` — замените их на свои. Команды:
-`mvn -f Downloader_hub\pom.xml clean package` (тесты и fat-jar), `.\build_appimage.bat`
-(mvn → jlink → jpackage → бандлинг браузеров; пятый шаг — запуск GUI, при сборке в CI
-эту строку можно закомментировать).
+#### Требования
 
-**Лицензия.** Код распространяется «как есть». Перед использованием в своих продуктах
-свяжитесь с автором.
+| Инструмент | Примечание |
+| --- | --- |
+| JDK 21.0.x | Hotspot — самый короткий путь |
+| Maven | 3.8+ |
+| Windows | `jpackage` требует установленного Wix Toolset MSI |
+| MSYS2 | Только для AppImage-сборки |
+
+#### Пути в скрипте
+
+`build_appimage.bat` содержит пути, специфичные для машины разработчика:
+
+```bat
+set "JDK=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+set "MSYS=C:\msys64"
+set "MVN=C:\maven\apache-maven-3.9.12\bin\mvn.cmd"
+set "PGBALL=C:\Program Files\Playwright Java\browsers"
+```
+
+Замените эти строки на пути своей машины перед запуском сборки.
+
+#### Команды
+
+```powershell
+# Проверка (54 теста)
+mvn -q -DskipTests=false test
+
+# Полная AppImage-сборка: Maven jar + jlink + jpackage + Playwright browsers
+cmd /c build_appimage.bat
+```
+
+Скрипт собирает Maven jar, создаёт минимальный Java runtime через `jlink`, затем собирает self-contained приложение через `jpackage`. Playwright browsers (`chromium-1248`, `chromium_headless_shell-1248`, `ffmpeg-1013`, `winldd-1007`) копируются в `app/app/browsers`.
+
+**Шаги**
+
+1. Изменить пути (JDK / MSYS / Maven / Playwright browsers)
+2. Запустить `cmd /c build_appimage.bat`
+3. Скрипт создаёт `appimage\dist\HLS Grabber\`
+
+### Структура репозитория
+
+```
+HLS Grabber/
+├─ build_appimage.bat           jpackage AppImage build (Windows)
+├─ .gitignore
+├─ bin/
+│  ├─ HlsGrabber              Linux launcher script
+│  └─ com.flynet.hlsgrabber.App  launcher metadata
+├─ src/main/java/com/flynet/hlsgrabber/
+│  ├─ App.java                Swing UI
+│  ├─ I18n.java             30 языков
+│  ├─ AppLogger.java        app.log
+│  ├─ UrlResolver.java      Playwright URL capture
+│  ├─ DownloadWorker.java   параллельные сегменты
+│  ├─ MpdParser.java        DASH .mpd
+│  └─ M3u8Parser.java       HLS .m3u8
+└─ src/test/java/com/flynet/hlsgrabber/
+   ├─ AppTest.java
+   └─ DownloadWorkerTest.java
+```
+
+### Лицензия
+
+- MIT
+- Третейский суд: Российская Федерация
+- Применимое право: российское законодательство
+
+Полный текст в [LICENSE](LICENSE).
