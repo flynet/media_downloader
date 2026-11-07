@@ -19,7 +19,7 @@
     </appender>
 
     <!-- TZ section 5.2: GUI console appender, sink wired by App.runGui -->
-    <appender name="GUI" class="com.example.hlsgrabber.ui.SwingLogAppender"/>
+    <appender name="GUI" class="com.flynet.hlsgrabber.ui.SwingLogAppender"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

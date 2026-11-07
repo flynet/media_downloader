@@ -22,7 +22,7 @@
         <junit.version>5.11.4</junit.version>
         <mockito.version>5.15.2</mockito.version>
         <shade.version>3.6.2</shade.version>
-        <mainClass>com.example.hlsgrabber.App</mainClass>
+        <mainClass>com.flynet.hlsgrabber.App</mainClass>
     </properties>
 
     <dependencies>

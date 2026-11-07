@@ -56,7 +56,7 @@ if not exist "%APP%\input" mkdir "%APP%\input"
 copy /Y "%JAR%" "%APP%\input\" >nul
 "%JDK%\bin\jpackage.exe" --type app-image --name "HLS Grabber" ^
   --input "%APP%\input" --main-jar hls-grabber-1.0-SNAPSHOT.jar ^
-  --main-class com.example.hlsgrabber.App ^
+  --main-class com.flynet.hlsgrabber.App ^
   --runtime-image "%APP%\runtime" ^
   --icon "%HUB%\src\main\resources\icon.ico" ^
   --dest "%APP%\dist"
