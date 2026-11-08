@@ -113,6 +113,4 @@ HLS Grabber/
 
 ## License
 
-- MIT
-
-Full text in [LICENSE](LICENSE).
+The program is distributed as is, without any warranty.
