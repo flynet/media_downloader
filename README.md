@@ -5,6 +5,8 @@ Open an m3u8/mpd, choose segments, save MP4/MKV without re-encoding.
 
 ![HLS Grabber screenshot](images/screenshot.png)
 
+**[Download for Windows x64](https://github.com/flynet/media_downloader/releases/download/v1.0.0/HLS-Grabber-1.0.0-windows-x64.zip)** — self-contained build with bundled runtime, no Java install needed. The JAR, SHA256 checksums, and full details are in [Releases](https://github.com/flynet/media_downloader/releases).
+
 ## Releases
 
 | File | What it is | Date | SHA256 |
