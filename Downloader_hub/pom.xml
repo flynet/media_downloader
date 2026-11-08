@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>hls-grabber</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>2.0.0</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -191,8 +191,8 @@
     </dependencies>
 
     <build>
-        <!-- fat jar name for probe harness acceptance: target\media_downloader.jar -->
-        <finalName>media_downloader</finalName>
+        <!-- release fat jar name: target\HLS-Grabber-2.0.0.jar -->
+        <finalName>HLS-Grabber-2.0.0</finalName>
         <plugins>
             <!-- Compile -->
             <plugin>

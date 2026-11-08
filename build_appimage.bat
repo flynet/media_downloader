@@ -40,7 +40,7 @@ echo [1/5] Maven clean package...
 call "%MAVEN_CMD%" -f "%HUB%\pom.xml" clean package
 if errorlevel 1 goto :fail
 
-set "JAR=%HUB%\target\media_downloader.jar"
+set "JAR=%HUB%\target\HLS-Grabber-2.0.0.jar"
 if not exist "%JAR%" ( echo ERROR: jar not found: %JAR% & goto :fail )
 
 echo [2/5] jlink runtime...
@@ -55,8 +55,8 @@ if exist "%APP%\dist" rmdir /s /q "%APP%\dist"
 if not exist "%APP%\input" mkdir "%APP%\input"
 del /q "%APP%\input\*.jar" >nul 2>nul
 copy /Y "%JAR%" "%APP%\input\" >nul
-"%JDK%\bin\jpackage.exe" --type app-image --name "HLS Grabber" ^
-  --input "%APP%\input" --main-jar media_downloader.jar ^
+"%JDK%\bin\jpackage.exe" --type app-image --name "HLS Grabber" --app-version 2.0.0 ^
+  --input "%APP%\input" --main-jar HLS-Grabber-2.0.0.jar ^
   --main-class com.flynet.hlsgrabber.App ^
   --runtime-image "%APP%\runtime" ^
   --icon "%HUB%\src\main\resources\icon.ico" ^
