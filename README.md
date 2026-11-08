@@ -3,7 +3,7 @@
 Self-contained Windows app for HLS/DASH downloads.
 Open an m3u8/mpd, choose segments, save MP4/MKV without re-encoding.
 
-![HLS Grabber screenshot](https://github.com/user-attachments/assets/f83134e2-5473-4a5d-b671-16671500d48d)
+![HLS Grabber screenshot](images/screenshot.png)
 
 ## Releases
 
