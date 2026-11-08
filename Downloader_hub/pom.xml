@@ -23,6 +23,11 @@
         <mockito.version>5.15.2</mockito.version>
         <shade.version>3.6.2</shade.version>
         <mainClass>com.flynet.hlsgrabber.App</mainClass>
+
+        <!-- FxProbe harness: JavaFX + AtlantaFX + JNA (Windows) -->
+        <javafx.version>21.0.4</javafx.version>
+        <atlantafx.version>2.1.0</atlantafx.version>
+        <jna.version>5.15.0</jna.version>
     </properties>
 
     <dependencies>
@@ -125,6 +130,45 @@
             <version>${logback.version}</version>
         </dependency>
 
+        <!-- JavaFX 21 (probe harness, classpath mode; win classifier bundles native dlls) -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+
+        <!-- AtlantaFX base theme (Cupertino light/dark) -->
+        <dependency>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>${atlantafx.version}</version>
+        </dependency>
+
+        <!-- JNA: DwmSetWindowAttribute (dark titlebar, Mica) via jna-platform DwmApi -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+            <version>${jna.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform</artifactId>
+            <version>${jna.version}</version>
+        </dependency>
+
         <!-- Tests -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -147,6 +191,8 @@
     </dependencies>
 
     <build>
+        <!-- fat jar name for probe harness acceptance: target\media_downloader.jar -->
+        <finalName>media_downloader</finalName>
         <plugins>
             <!-- Compile -->
             <plugin>
@@ -199,6 +245,11 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <!-- modular jars (JavaFX, AtlantaFX, JNA) merged into one
+                                             classpath jar: drop root module-info.class, FX ignores
+                                             module metadata on classpath -->
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/*/module-info.class</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

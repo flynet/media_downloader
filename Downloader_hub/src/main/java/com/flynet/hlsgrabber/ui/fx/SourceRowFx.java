@@ -1,23 +1,32 @@
-package com.flynet.hlsgrabber.ui;
+package com.flynet.hlsgrabber.ui.fx;
 
 import com.flynet.hlsgrabber.manifest.SourceRecord;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.Button;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.Region;
 
-import javax.swing.*;
-import java.awt.*;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One source row as a rounded card (TZ 5.2): title, clipped URL (full in tooltip),
- * state line with progress/speed/stage, and a state-dependent primary action button.
- * Flat "Apple Glass" card: rounded fill, 1px border (accent on hover), soft shadow
- * layers; all colors follow the active theme at paint/update time.
+ * One source row as a rounded card (FX mirror of Swing SourceRowPanel): title,
+ * clipped URL (full in tooltip), state line with progress/speed/stage, and a
+ * state-dependent primary action button. Flat "Apple Glass" card: rounded fill,
+ * 1px border (accent on hover); colors follow the active theme on toggle.
  * Right-click: "Copy link".
  */
-public final class SourceRowPanel extends JPanel {
+public final class SourceRowFx extends HBox {
 
     public interface RowActions {
         void enqueue(SourceRecord rec, int qualityHeight);
@@ -26,7 +35,7 @@ public final class SourceRowPanel extends JPanel {
         void openOutput(String outPath);
     }
 
-    private record QualityOption(int height, String label) {
+    public record QualityOption(int height, String label) {
         @Override
         public String toString() {
             return label;
@@ -37,111 +46,92 @@ public final class SourceRowPanel extends JPanel {
 
     private final SourceRecord rec;
     private final RowActions actions;
-    private final JLabel titleLabel = new JLabel();
-    private final JLabel urlLabel = new JLabel();
-    private final JLabel infoLabel = new JLabel();
-    private final JButton button = new JButton("Download");
-    private final JComboBox<QualityOption> qualitySelector = new JComboBox<>();
+    private final Label titleLabel = new Label();
+    private final Label urlLabel = new Label();
+    private final Label infoLabel = new Label();
+    private final Button button = new Button("Download");
+    private final ComboBox<QualityOption> qualitySelector = new ComboBox<>();
     private List<QualityOption> displayedQualities = List.of();
     private boolean hover;
+    private SourceRecord.State lastState = SourceRecord.State.FOUND;
 
-    public SourceRowPanel(SourceRecord rec, RowActions actions) {
+    public SourceRowFx(SourceRecord rec, RowActions actions) {
         this.rec = rec;
         this.actions = actions;
 
-        setLayout(new BorderLayout(8, 2));
-        setOpaque(false);
-        setBorder(BorderFactory.createEmptyBorder(8, 14, 10, 14));
-        setAlignmentX(LEFT_ALIGNMENT);
-        setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
+        setSpacing(8);
+        setPadding(new Insets(8, 14, 10, 14));
+        setAlignment(Pos.CENTER_LEFT);
+        setMaxHeight(88);
 
-        titleLabel.putClientProperty("role", "title");
-        urlLabel.putClientProperty("role", "secondary");
-        ThemeManager.applyRoleStyles(titleLabel);
-        ThemeManager.applyRoleStyles(urlLabel);
+        VBox left = new VBox(2, titleLabel, urlLabel, infoLabel);
+        HBox.setHgrow(left, Priority.ALWAYS);
+        Region gap = new Region();
+        VBox right = new VBox(10, qualitySelector, button);
+        qualitySelector.setPrefWidth(140);
+        button.setMaxWidth(160);
+        button.setAlignment(Pos.CENTER);
+        getChildren().addAll(left, gap, right);
 
-        add(titleLabel, BorderLayout.NORTH);
-        add(urlLabel, BorderLayout.CENTER);
-        add(infoLabel, BorderLayout.SOUTH);
+        ThemeBridge.applyRole(titleLabel, "title");
+        ThemeBridge.applyRole(urlLabel, "secondary");
 
-        JPanel east = new JPanel();
-        east.setOpaque(false);
-        east.setLayout(new BoxLayout(east, BoxLayout.Y_AXIS));
-        qualitySelector.setPreferredSize(new Dimension(140, 34));
-        qualitySelector.setMaximumSize(new Dimension(140, 34));
-        qualitySelector.setAlignmentX(Component.LEFT_ALIGNMENT);
-        qualitySelector.addActionListener(e -> updateButtonText(rec.state()));
-        east.add(qualitySelector);
-        east.add(Box.createVerticalStrut(10));
-        button.putClientProperty("primary", true);
-        button.setMaximumSize(new Dimension(160, 34));
-        button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.addActionListener(e -> onButton());
-        east.add(button);
-        add(east, BorderLayout.EAST);
+        qualitySelector.setOnAction(e -> updateButtonText(rec.state()));
+        button.setOnAction(e -> onButton());
 
-        JPopupMenu popup = new JPopupMenu();
-        JMenuItem copy = new JMenuItem("Copy link");
-        copy.addActionListener(e -> {
-            StringSelection sel = new StringSelection(rec.canonicalUrl);
-            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(sel, null);
+        ContextMenu menu = new ContextMenu();
+        MenuItem copy = new MenuItem("Copy link");
+        copy.setOnAction(e -> {
+            ClipboardContent c = new ClipboardContent();
+            c.putString(rec.canonicalUrl);
+            Clipboard.getSystemClipboard().setContent(c);
         });
-        popup.add(copy);
-        MouseAdapter popupTrigger = new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                maybe(e);
-            }
+        menu.getItems().add(copy);
+        setOnContextMenuRequested(e -> menu.show(getScene().getWindow(), e.getScreenX(), e.getScreenY()));
 
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                maybe(e);
-            }
+        setOnMouseEntered(e -> {
+            hover = true;
+            applyCard();
+        });
+        setOnMouseExited(e -> {
+            hover = false;
+            applyCard();
+        });
 
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                hover = true;
-                repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                hover = false;
-                repaint();
-            }
-
-            private void maybe(MouseEvent e) {
-                if (e.isPopupTrigger()) {
-                    popup.show(SourceRowPanel.this, e.getX(), e.getY());
-                }
-            }
-        };
-        addMouseListener(popupTrigger);
-        titleLabel.addMouseListener(popupTrigger);
-        urlLabel.addMouseListener(popupTrigger);
-        infoLabel.addMouseListener(popupTrigger);
+        ThemeBridge.register(this, p -> cardStyle(p));
+        ThemeBridge.register(infoLabel, this::infoStyle);
+        // flat white field for the quality combo, accent-filled primary button
+        ThemeBridge.register(qualitySelector, p -> "-fx-background-color: " + p.field() + ", " + p.field()
+                + "; -fx-background-radius: 8; -fx-background-insets: 0, 1; -fx-padding: 6 10; -fx-font-size: 13;"
+                + " -fx-text-fill: " + p.textPrimary() + "; -fx-prompt-text-fill: " + p.textSecondary() + ";");
+        ThemeBridge.register(button, p -> "-fx-background-color: " + p.accent() + ", " + p.accent()
+                + "; -fx-background-radius: 8; -fx-text-fill: white; -fx-font-size: 12;");
 
         update(rec.snapshot());
     }
 
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        Theme t = ThemeManager.current();
-        int w = getWidth();
-        int h = getHeight();
-        int r = t.cardRadius();
-        for (int i = 2; i >= 1; i--) {
-            g2.setColor(t.shadow());
-            g2.fillRoundRect(1, 2 + i, w - 3, h - 6, r * 2, r * 2);
-        }
-        g2.setColor(t.cardBackground());
-        g2.fillRoundRect(1, 2, w - 3, h - 6, r * 2, r * 2);
-        g2.setColor(hover ? t.accent() : t.cardBorder());
-        g2.drawRoundRect(1, 2, w - 3, h - 6, r * 2, r * 2);
-        g2.dispose();
+    private String cardStyle(ThemeBridge.Palette p) {
+        String border = hover ? p.accent() : p.cardBorder();
+        return "-fx-background-color: " + p.card()
+                + "; -fx-background-radius: " + p.cardRadius()
+                + "; -fx-border-color: " + border
+                + "; -fx-border-width: 1; -fx-border-radius: " + p.cardRadius();
+    }
+
+    private void applyCard() {
+        setStyle(cardStyle(ThemeBridge.palette(ThemeBridge.mode())));
+    }
+
+    private String infoStyle(ThemeBridge.Palette p) {
+        String color = switch (lastState) {
+            case FOUND -> p.accent();
+            case QUEUED -> p.textPrimary();
+            case DOWNLOADING -> p.accent();
+            case DONE -> p.statusDone();
+            case ERROR -> p.statusError();
+            case CANCELLED -> p.statusCancelled();
+        };
+        return "-fx-font-family: \"Inter Medium\", \"Inter\", \"Segoe UI\"; -fx-font-size: 12px; -fx-text-fill: " + color;
     }
 
     private void onButton() {
@@ -153,37 +143,25 @@ public final class SourceRowPanel extends JPanel {
         }
     }
 
-    /** Must be called on the EDT. */
+    /** Must be called on the FX app thread. */
     public void update(SourceRecord.View v) {
-        Theme t = ThemeManager.current();
+        lastState = v.state();
         String title = v.pageTitle() == null || v.pageTitle().isBlank()
                 ? "Video" : v.pageTitle();
         titleLabel.setText(title);
-        titleLabel.setFont(t.titleFont());
-        titleLabel.setForeground(t.textPrimary());
 
         // YouTube rows are keyed by "yt:<videoId>" (dedup), but the user sees the watch URL
         String url = v.kind() == SourceRecord.Kind.YOUTUBE && v.pageUrl() != null
                 ? v.pageUrl() : v.canonicalUrl();
         urlLabel.setText(url.length() > URL_CLIP ? url.substring(0, URL_CLIP) + "…" : url);
-        urlLabel.setToolTipText(url);
-        urlLabel.setFont(t.baseFont());
-        urlLabel.setForeground(t.textSecondary());
+        urlLabel.setTooltip(new Tooltip(url));
 
         updateQualityOptions(v.qualities());
         qualitySelector.setVisible(!displayedQualities.isEmpty());
-        qualitySelector.setEnabled(v.state() == SourceRecord.State.FOUND);
+        qualitySelector.setDisable(v.state() != SourceRecord.State.FOUND);
 
         infoLabel.setText(stateText(v));
-        infoLabel.setFont(t.baseFont());
-        infoLabel.setForeground(switch (v.state()) {
-            case FOUND -> t.accent();
-            case QUEUED -> t.textPrimary();
-            case DOWNLOADING -> t.statusDownloading();
-            case DONE -> t.statusDone();
-            case ERROR -> t.statusError();
-            case CANCELLED -> t.statusCancelled();
-        });
+        infoLabel.setStyle(infoStyle(ThemeBridge.palette(ThemeBridge.mode())));
         updateButtonText(v.state());
     }
 
@@ -205,20 +183,19 @@ public final class SourceRowPanel extends JPanel {
 
         int selectedHeight = selectedQualityHeight();
         displayedQualities = List.copyOf(options);
-        qualitySelector.setModel(new DefaultComboBoxModel<>(
-                displayedQualities.toArray(QualityOption[]::new)));
+        qualitySelector.setItems(javafx.collections.FXCollections.observableArrayList(displayedQualities));
         for (int i = 0; i < displayedQualities.size(); i++) {
             if (displayedQualities.get(i).height() == selectedHeight) {
-                qualitySelector.setSelectedIndex(i);
+                qualitySelector.getSelectionModel().select(i);
                 return;
             }
         }
-        qualitySelector.setSelectedIndex(0);
+        qualitySelector.getSelectionModel().select(0);
     }
 
     private int selectedQualityHeight() {
-        Object selected = qualitySelector.getSelectedItem();
-        return selected instanceof QualityOption option ? option.height() : 0;
+        QualityOption sel = qualitySelector.getValue();
+        return sel != null ? sel.height() : 0;
     }
 
     private void updateButtonText(SourceRecord.State state) {
@@ -234,8 +211,8 @@ public final class SourceRowPanel extends JPanel {
         if (displayedQualities.isEmpty()) {
             return "Download";
         }
-        Object selected = qualitySelector.getSelectedItem();
-        String label = selected instanceof QualityOption option ? option.label() : "best available";
+        QualityOption sel = qualitySelector.getValue();
+        String label = sel != null ? sel.label() : "best available";
         return label.equals("best available")
                 ? "Download best" : "Download " + label;
     }
@@ -299,5 +276,30 @@ public final class SourceRowPanel extends JPanel {
 
     private static String fmtMb(long bytes) {
         return String.format("%.1f MB", bytes / 1048576.0);
+    }
+
+    // harness accessors (package-visible tests)
+    public Button actionButton() {
+        return button;
+    }
+
+    public Label urlLabel() {
+        return urlLabel;
+    }
+
+    public Label titleLabel() {
+        return titleLabel;
+    }
+
+    public Label infoLabel() {
+        return infoLabel;
+    }
+
+    public ComboBox<QualityOption> qualitySelector() {
+        return qualitySelector;
+    }
+
+    public SourceRecord record() {
+        return rec;
     }
 }
