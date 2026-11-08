@@ -112,8 +112,6 @@ HLS Grabber/
 ## License
 
 - MIT
-- Arbitration court: Russian Federation
-- Applicable law: Russian Federation
 
 Full text in [LICENSE](LICENSE).
 
@@ -228,7 +226,5 @@ HLS Grabber/
 ### Лицензия
 
 - MIT
-- Третейский суд: Российская Федерация
-- Применимое право: российское законодательство
 
 Полный текст в [LICENSE](LICENSE).
