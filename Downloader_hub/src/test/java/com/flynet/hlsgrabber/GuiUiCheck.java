@@ -22,16 +22,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * registry records, and verifies that rows render on the EDT (title / clipped URL /
  * state line). Run with -Djava.awt.headless=true.
  *
- * Новая семантика (TZ 9 строка 192 + список качеств):
- * - записи остаются FOUND, пока пользователь не нажмёт «Скачать» (авто-очереди нет);
- * - в строке FOUND показывается список качеств ("Найдено · качества: 1080p, 720p, 480p");
- * - клик по кнопке строки ставит запись в очередь (состояние уходит из FOUND).
- *
- * Выход: 0 = проверки пройдены, 1 = ошибка.
- *
  * New semantics (TZ 9 line 192 + quality list):
- * - records stay FOUND until the user clicks "Скачать" (no auto-enqueue);
- * - FOUND row shows the available quality list ("Найдено · качества: 1080p, 720p, 480p");
+ * - records stay FOUND until the user clicks "Download" (no auto-enqueue);
+ * - FOUND row shows the available quality list ("Found · qualities: 1080p, 720p, 480p");
  * - clicking the row button enqueues the record (state leaves FOUND).
  *
  * Exit: 0 = checks pass, 1 = failure.
@@ -54,7 +47,6 @@ public class GuiUiCheck {
 
         SourceListPanel panel = new SourceListPanel(registry, queue, launcher);
 
-        // внедряем записи, имитируя вывод sniffера (мелкий файл отсекается min-size)
         // inject records, mimicking sniffer output (small file is filtered by min-size)
         registry.add("https://cdn.example/vid/master.m3u8?token=abc", SourceRecord.Kind.HLS,
                 "https://site.example/watch?v=1", "Test Video Title", 0);
@@ -65,7 +57,6 @@ public class GuiUiCheck {
         registry.add("https://cdn.example/vid/seg-1-v1-a1.m4s?e=179", SourceRecord.Kind.MP4,
                 "https://site.example/watch?v=1", "Test Video Title", 3_000_000L);
 
-        // список качеств внедряется так, как снафер извлёк бы его из мастер-плейлиста
         // quality list injected as the sniffer would extract it from a master playlist
         SourceRecord hlsRec = registry.records().stream()
                 .filter(r -> r.canonicalUrl.startsWith("https://cdn.example/vid/master.m3u8"))
@@ -73,7 +64,6 @@ public class GuiUiCheck {
                 .orElseThrow();
         hlsRec.setQualities(List.of(720, 1080, 480));
 
-        // дать таймеру Swing (700 мс) сработать минимум дважды
         // let the Swing timer (700 ms) fire at least twice
         Thread.sleep(1500);
 
@@ -93,7 +83,7 @@ public class GuiUiCheck {
             }
         }
 
-        boolean qualitiesShown = texts.contains("Найдено / Found · качества / qualities: 1080p, 720p, 480p");
+        boolean qualitiesShown = texts.contains("Found · qualities: 1080p, 720p, 480p");
         boolean noAutoEnqueue = hlsRec.state() == SourceRecord.State.FOUND;
 
         System.out.println("rows=" + rowCount + " (expected 3: HLS + big MP4 + segment-as-MP4; small filtered)");
@@ -101,15 +91,12 @@ public class GuiUiCheck {
         System.out.println("QUALITIES_SHOWN=" + qualitiesShown);
         System.out.println("NO_AUTO_ENQUEUE=" + noAutoEnqueue);
 
-        // имитируем клик «Скачать» на HLS-строке
-        // simulate the user clicking "Скачать" on the HLS row
+        // simulate the user clicking "Download" on the HLS row
         JButton hlsButton = buttonInRowFor(panel, "https://cdn.example/vid/master.m3u8");
         System.out.println("DOWNLOAD_BUTTON=" + (hlsButton != null && hlsButton.isEnabled()));
         SwingUtilities.invokeLater(() -> hlsButton.doClick());
         Thread.sleep(300);
 
-        // воркер работает против несуществующего CDN => состояние должно уйти из FOUND
-        // (QUEUED/DOWNLOADING => позже ERROR из-за сбоя fetch)
         // worker runs against a nonexistent CDN => state must leave FOUND
         // (QUEUED/DOWNLOADING => later ERROR from the fetch failure)
         boolean enqueued = false;
@@ -136,7 +123,6 @@ public class GuiUiCheck {
         System.exit(ok ? 0 : 1);
     }
 
-    /** Находит JButton действия в строке, чей ярлык URL начинается с заданного префикса. */
     /** Finds the action JButton inside the row whose URL label starts with the given prefix. */
     private static JButton buttonInRowFor(Component root, String urlPrefix) {
         List<Component> all = new ArrayList<>();

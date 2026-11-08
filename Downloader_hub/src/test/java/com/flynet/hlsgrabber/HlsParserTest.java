@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Тесты HLS-парсера (TZ раздел 9): мастер, медиа, AES-128, EXT-X-MAP, byterange, live. */
 /** HLS parser tests (TZ section 9): master, media, AES-128, EXT-X-MAP, byterange, live. */
 class HlsParserTest {
 
@@ -140,7 +139,6 @@ class HlsParserTest {
                 #EXT-X-ENDLIST
                 """;
         MediaPlaylist p = HlsParser.parseMedia(media);
-        // KEY:METHOD=NONE сбрасывает состояние ключа до «нет ключа»
         // KEY:METHOD=NONE resets the key state to "no key"
         assertNull(p.playlistKey());
     }

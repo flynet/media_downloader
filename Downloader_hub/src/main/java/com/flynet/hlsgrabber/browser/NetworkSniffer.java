@@ -22,38 +22,22 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Навешивает на страницу слушатели Playwright-ответов, фильтрует кандидаты по URL,
- * кладёт события в очередь; поток pump записывает их в SourceRegistry /
  * Attaches Playwright response listeners on the page, filters candidate URLs,
  * puts events into a queue; the pump-thread records them in SourceRegistry.
  *
- * Правила (R7 + находки probe3) / Rules (R7 + probe3 findings):
- * - колбэки слушателя захватывают только заголовки: без body(), без round-trip вызовов
- *   на потоке-диспетчере / listener callbacks capture headers only: no body(),
+ * Rules (R7 + probe3 findings):
+ * - listener callbacks capture headers only: no body(),
  *   no round-trip calls on the dispatcher thread;
- * - pump НЕ делает сетевых вызовов сам (ctx.request().get() подвесил pump во время
- *   штормов событий phncdn -> TargetClosedError при закрытии) / pump makes NO network
- *   calls of its own (ctx.request().get() hung the pump during phncdn event storms
- *   -> TargetClosedError at close);
- * - pump — ЕДИНСТВЕННЫЙ Playwright round-trip caller в GUI; главный поток и UI-потоки
- *   не должны трогать page/locator, пока события идут (ломается протокол диспетчера) /
- *   pump is the ONLY Playwright round-trip caller in the GUI; main/UI threads
+ * - pump makes NO network calls of its own (ctx.request().get() hung the pump during
+ *   phncdn event storms -> TargetClosedError at close);
+ * - pump is the ONLY Playwright round-trip caller in the GUI; main/UI threads
  *   must not touch page/locator while events flow (dispatcher protocol breaks);
- * - тела манифестов выбираются лениво в worker-загрузке; record.masterUrl хранит
- *   оригинальный подписанный URL (CDN-подписи нельзя канонизировать) / manifest bodies
- *   are fetched lazily in the download worker; record.masterUrl keeps the original
- *   signed URL (CDN signature params must not be canonicalized away);
- * - медиальные сегменты (.m4s/.ts/.mp2t/.key) никогда не становятся отдельными строками;
- *   >=3 сегментных GET из одной директории (hls.js грузит плейлист внутри страницы,
- *   Playwright видит только сегментные GET) синтезируют HLS-строку с master =
- *   <dir>index-v1-a1.m3u8 / media segments (.m4s/.ts/.mp2t/.key) never become rows of
- *   their own; >=3 segment GETs from one directory (hls.js fetches the playlist in-page,
- *   Playwright sees only segment GETs) synthesize an HLS row with master = <dir>index-v1-a1.m3u8;
- * - phncdn подписывает каждый путь отдельно (probe5: playlist/init/segments, загруженные
- *   с подписью другого пути, дают HTTP 500). Pump записывает точный подписанный URL
- *   каждого manifest/segment/key события в карту {@code recorded} владеющей записи
- *   (имя файла -> URL); worker грузит по recorded-URL, falling back к constructed на
- *   unsigned стендах / phncdn signs each path individually (probe5: playlist/init/segments
+ * - manifest bodies are fetched lazily in the download worker; record.masterUrl keeps the
+ *   original signed URL (CDN signature params must not be canonicalized away);
+ * - media segments (.m4s/.ts/.mp2t/.key) never become rows of their own; >=3 segment
+ *   GETs from one directory (hls.js fetches the playlist in-page, Playwright sees only
+ *   segment GETs) synthesize an HLS row with master = <dir>index-v1-a1.m3u8;
+ * - phncdn signs each path individually (probe5: playlist/init/segments
  *   fetched with the signature of another path return HTTP 500). The pump records the exact
  *   signed URL of every manifest/segment/key event into the owning record's {@code recorded}
  *   map (filename -> URL); the worker downloads by recorded URLs, falling back to
@@ -73,7 +57,7 @@ public class NetworkSniffer {
         this.registry = registry;
     }
 
-    /** Навешивает слушатели ответов на страницу; pump становится единственным Playwright caller / Attach response listeners to the page; pump becomes the sole Playwright caller. */
+    /** Attach response listeners to the page; pump becomes the sole Playwright caller. */
     public void attach(Page page) {
         page.onResponse(this::onResponse);
         Thread pump = new Thread(() -> pumpLoop(page), "sniffer-pump");
@@ -85,12 +69,11 @@ public class NetworkSniffer {
         running = false;
     }
 
-    /** Число обработанных pump-ом sniff-событий (диагностика для harness'ов) / Number of sniff events processed by the pump (diagnostics for harnesses). */
+    /** Number of sniff events processed by the pump (diagnostics for harnesses). */
     public int eventCount() {
         return processed.get();
     }
 
-    // ---------- поток-диспетчер: только заголовки, без body(), без round-trips ----------
     // ---------- dispatch thread: headers only, no body(), no round-trips ----------
 
     private void onResponse(Response response) {
@@ -108,8 +91,6 @@ public class NetworkSniffer {
             String path = UrlUtils.pathOf(url).toLowerCase();
             String ct = response.headers().get("content-type");
             String ctLow = ct == null ? "" : ct.toLowerCase();
-            // probe17: заголовки запроса, отправленные браузером (cookie/referer/origin/user-agent,
-            // строчные) — единственный снимок, проходящий CDN-проверки доступа на реальных сайтах
             // probe17: the browser-sent request headers (cookie/referer/origin/user-agent,
             // lowercase) are the only snapshot that passes CDN access checks on real sites
             Map<String, String> reqHeaders = null;
@@ -126,7 +107,6 @@ public class NetworkSniffer {
             } else if (ctLow.contains("dash+xml") || path.endsWith(".mpd")) {
                 queue.add(new SniffEvent(SniffEvent.Kind.DASH, url, status, 0, reqHeaders, response));
             } else if (UrlUtils.isSegmentPath(path)) {
-                // Pornhub отдаёт .m4s с Content-Type video/mp4 — классифицируем по пути первым
                 // Pornhub serves .m4s with Content-Type video/mp4 — classify by path first
                 queue.add(new SniffEvent(SniffEvent.Kind.SEGMENT, url, status, 0, reqHeaders, response));
             } else if (ctLow.startsWith("video/mp4") || path.endsWith(".mp4")) {
@@ -138,7 +118,6 @@ public class NetworkSniffer {
         }
     }
 
-    // ---------- поток pump: единственный Playwright round-trip caller ----------
     // ---------- pump thread: the only Playwright round-trip caller ----------
 
     private void pumpLoop(Page page) {
@@ -146,18 +125,12 @@ public class NetworkSniffer {
         String lastYouTubeId = null;
         long lastYouTubeAttempt = 0;
         while (running) {
-            // Форсируем round-trip, чтобы Playwright-диспетчер доставил queued response
-            // события. События fires только во время API-вызовов; queue.poll alone
-            // морит sniff (headless + headful smoke: события падали только при закрытии браузера)
             // Force a round-trip so the Playwright dispatcher delivers the queued response
             // events. Events fire only during API calls; queue.poll alone starves the sniffer
             // (headless + headful smoke: events landed only at browser close).
             try {
                 page.evaluate("1");
             } catch (Exception e) {
-                // известная Java-гонка диспетчера "Object doesn't exist: response@..." во время
-                // штормов событий: транзиентно, диспетчер восстанавливается на следующем round-trip.
-                // Продолжаем pumping.
                 // known Java dispatcher race "Object doesn't exist: response@..." during event
                 // storms: transient, dispatcher recovers on the next round-trip. Keep pumping.
                 log.debug("pump round-trip race: {}", e.getMessage());
@@ -165,10 +138,6 @@ public class NetworkSniffer {
                     return;
                 }
             }
-            // YouTube: веб-плеер отдаёт медиа через серверный ABR, поэтому слушатель ответов
-            // никогда не видит downloadable URL. Pump спрашивает inner-tube player API
-            // (VISIONOS клиент) из самой страницы — единственный caller, которому разрешён
-            // round-trip к странице.
             // YouTube: the web player serves media over server-side ABR, so the response
             // listener never sees a downloadable URL. The pump asks the inner-tube player
             // API (VISIONOS client) from the page itself — the only caller allowed to
@@ -179,8 +148,6 @@ public class NetworkSniffer {
                     long now = System.currentTimeMillis();
                     if (now - lastYouTubeAttempt > 3000) {
                         lastYouTubeAttempt = now;
-                        // повторяем, пока player response не снят: страница может ещё грузиться
-                        // (нет visitorData -> inner-tube вызов проходит bot-проверку)
                         // retry until the player response is captured: the page may still be
                         // loading (no visitorData yet -> the inner-tube call is bot-checked)
                         if (captureYouTube(page, ytId)) {
@@ -217,16 +184,11 @@ public class NetworkSniffer {
     }
 
     /**
-     * YouTube capture: спрашивает inner-tube player API изнутри страницы (cookies +
-     * visitorData watch-страницы) и регистрирует запись YOUTUBE со списком качеств.
-     * Сырой player response хранится в записи и потребляется worker-загрузкой
-     * (подписанный URL никогда не попадает в лог) /
      * YouTube capture: asks the inner-tube player API from inside the page (cookies +
      * visitorData of the watch page) and registers a YOUTUBE record with the quality
      * list. The raw player response is stored in the record and consumed by the
      * download worker (no signed URL ever reaches the log).
      *
-     * @return true когда запись существует (снята или уже зарегистрирована)
      * @return true when the record exists (captured or already registered)
      */
     private boolean captureYouTube(Page page, String videoId) {
@@ -237,7 +199,7 @@ public class NetworkSniffer {
                 "payloadTemplate", YouTubeApi.payloadTemplate(videoId),
                 "visitor", ""));
         if (json == null || json.isBlank()) {
-            log.debug("YouTube: пустой ответ player API для {}", videoId);
+            log.debug("YouTube: empty player API response for {}", videoId);
             return false;
         }
         YouTubePlayer.Player player = YouTubePlayer.parse(json);
@@ -261,7 +223,7 @@ public class NetworkSniffer {
         rec.setFetchHeaders(cookieHeaderOf(page, pageUrl), userAgentOf(page), pageUrl,
                 UrlUtils.originOf(pageUrl));
         registry.add(rec);
-        log.info("Найден YouTube: {} — {}", videoId, player.title());
+        log.info("Found YouTube: {} — {}", videoId, player.title());
         return true;
     }
 
@@ -281,8 +243,6 @@ public class NetworkSniffer {
         String filename = UrlUtils.lastSegment(url);
         SourceRecord existing = registry.get(canonical);
         if (existing != null) {
-            // тот же путь файла запрошен повторно: держим одну строку; апгрейд до свежего
-            // подписанного URL
             // same file path re-requested: keep one row; upgrade to the fresh signed URL
             if (kind == SourceRecord.Kind.HLS) {
                 existing.setMasterUrl(url);
@@ -294,9 +254,6 @@ public class NetworkSniffer {
         String dir = UrlUtils.canonicalDir(url);
         SourceRecord owner = findDirOwner(dir);
         if (owner != null) {
-            // директория принадлежит HLS-записи: playlist/segment/key GET и init-сегмент
-            // (.mp4 с именем init*) подключаются в её recorded-карту, никогда в строки;
-            // обычные .mp4-файлы в той же директории (stand big.mp4, трейлеры) остаются строками
             // dir is owned by an HLS record: playlist/segment/key GETs and the init
             // segment (.mp4 named init*) wire into its recorded map, never into rows;
             // plain .mp4 files in the same dir (stand big.mp4, trailers) stay rows
@@ -314,8 +271,6 @@ public class NetworkSniffer {
         }
         String pageUrl = page.url();
         String title = pageTitleOf(page);
-        // probe17: предпочитаем точные заголовки, отправленные браузером для ЭТОГО url
-        // (CDN Referer + CDN-доменный Cookie из iframe-плеера); снимок верхней страницы — фолбэк
         // probe17: prefer the exact headers the browser sent for THIS url (CDN Referer +
         // CDN-domain Cookie from the player iframe); top-page snapshot is the fallback
         String cookie = ev.header("cookie") != null ? ev.header("cookie")
@@ -328,7 +283,7 @@ public class NetworkSniffer {
                 kind == SourceRecord.Kind.HLS ? url : null);
         rec.setFetchHeaders(cookie, ua, referer, origin);
         registry.add(rec);
-        log.info("Найден {}: {}{}", kind, url, title == null || title.isBlank() ? "" : " — " + title);
+        log.info("Found {}: {}{}", kind, url, title == null || title.isBlank() ? "" : " — " + title);
         if (kind == SourceRecord.Kind.HLS) {
             rec.putRecorded(filename, url);
             mergeQualities(ev, rec);
@@ -336,10 +291,6 @@ public class NetworkSniffer {
     }
 
     /**
-     * Pump-side извлечение качеств (pump — единственный Playwright round-trip caller):
-     * один раз берёт тело манифеста через response.text() и мёрджит доступные высоты
-     * в запись. Мастер-плейлисты объявляют варианты как #EXT-X-STREAM-INF:RESOLUTION=WxH;
-     * per-quality плейлист-файлы на реальных сайтах несут RESOLUTION в коммент-строках /
      * Pump-side quality extraction (the pump is the sole Playwright round-trip caller):
      * fetch the manifest body once via response.text() and merge the available heights
      * into the record. Master playlists declare variants as #EXT-X-STREAM-INF:RESOLUTION=WxH;
@@ -367,7 +318,7 @@ public class NetworkSniffer {
         List<Integer> after = rec.qualities();
         if (!after.equals(before)) {
             String ps = after.stream().map(h -> h + "p").collect(Collectors.joining(", "));
-            log.info("Качества {}: {} — {}", rec.kind, ps, rec.canonicalUrl);
+            log.info("Qualities {}: {} — {}", rec.kind, ps, rec.canonicalUrl);
         }
     }
 
@@ -378,7 +329,7 @@ public class NetworkSniffer {
             try {
                 heights.add(Integer.parseInt(m.group(2)));
             } catch (NumberFormatException e) {
-                // пропускаем некорректную запись / ignore malformed entry
+                // ignore malformed entry
             }
         }
         return heights;
@@ -388,10 +339,6 @@ public class NetworkSniffer {
             Pattern.compile("RESOLUTION=(\\d+)x(\\d+)", Pattern.CASE_INSENSITIVE);
 
     /**
-     * Детект segment family: >=3 сегментных GET из одной директории синтезируют HLS-строку
-     * (hls.js грузит плейлист внутри страницы, Playwright видит только сегментные GET).
-     * Каждый segment/key GET во владеющей директории записывается в {@code recorded}-карту
-     * владельца для download по подписанным URL worker-ом /
      * Segment family detection: >=3 segment GETs from one directory synthesize an HLS
      * row (hls.js fetches the playlist in-page, Playwright sees only segment GETs).
      * Every segment/key GET in an owned directory is recorded into the owner's
@@ -430,7 +377,6 @@ public class NetworkSniffer {
             String pageUrl = page.url();
             SourceRecord rec = new SourceRecord(canonical, SourceRecord.Kind.HLS, pageUrl,
                     pageTitleOf(page), 0, masterUrl);
-            // probe17: заголовки как отправлены браузером для segment-запроса
             // probe17: headers as the browser sent them for the segment request
             rec.setFetchHeaders(ev.header("cookie"), ev.header("user-agent"),
                     ev.header("referer") != null ? ev.header("referer") : pageUrl,
@@ -439,11 +385,11 @@ public class NetworkSniffer {
             for (Map.Entry<String, String> e : m.entrySet()) {
                 rec.putRecorded(e.getKey(), e.getValue());
             }
-            log.info("Family-детект: {} сегментных GET из {} → HLS-запись", m.size(), dirPrefix);
+            log.info("Family detection: {} segment GETs from {} → HLS record", m.size(), dirPrefix);
         }
     }
 
-    /** HLS-запись, владеющая канонической директорией (playlist/init/segments — цель подключения) / HLS record owning a canonical directory (playlist/init/segments wire target). */
+    /** HLS record owning a canonical directory (playlist/init/segments wire target). */
     private SourceRecord findDirOwner(String dir) {
         for (SourceRecord r : registry.records()) {
             if (r.kind == SourceRecord.Kind.HLS

@@ -14,7 +14,7 @@ appimage/
 *.iml
 
 # --- Local experiments and scratch space ------------------------------------
-# agent-facing project docs (ТЗ, план, статус, spike-отчёты): keep them local,
+# agent-facing project docs (spec, plan, status, spike reports): keep them local,
 # they are not part of the public repo
 Downloader_hub/src/docs/
 /spikes/

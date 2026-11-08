@@ -10,17 +10,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Обнаруженный источник (HLS-манифест, DASH-манифест, прямой MP4) и его состояние.
- * Изменяемые поля, безопасные для многопоточности; UI читает через snapshot()
- * (неизменяемое представление).
- *
  * A detected source (HLS manifest, DASH manifest, direct MP4) and its state.
  * Thread-safe mutable fields; UI reads via snapshot() (immutable view).
  */
 public final class SourceRecord {
 
-    /** Доступные высоты видео (p, px) по убыванию, как объявлено в манифесте.
-     *  Available video heights (p, px), descending, as reported by the manifest. */
+    /** Available video heights (p, px), descending, as reported by the manifest. */
     private volatile List<Integer> qualities = List.of();
 
     public enum Kind { HLS, DASH, MP4, YOUTUBE }
@@ -31,12 +26,6 @@ public final class SourceRecord {
     public final String pageUrl;
     public final String pageTitle;
     /**
-     * Исходный URL манифеста (с подписью), null для MP4. Находка на реальном сайте (probe5):
-     * CDN phncdn подписывает каждый путь к файлу индивидуально (параметры h/e/f), поэтому подпись
-     * одного ресурса НЕ переиспользуется для плейлиста/init/сегментов другого пути (HTTP 500).
-     * Pump sniffера обновляет это поле до подписанного URL соответствующего события манифеста
-     * и записывает каждый запрошенный браузером URL в {@link #recorded}.
-     *
      * original manifest URL (with signature), null for MP4. Real-site finding (probe5):
      * phncdn CDN signs each file path individually (h/e/f params), so a signature from
      * one resource is NOT reusable for playlist/init/segments of another path (HTTP 500).
@@ -45,9 +34,7 @@ public final class SourceRecord {
      */
     private volatile String masterUrl;
 
-    /** filename/ключ → точный подписанный URL, который запросил браузер (карта по канонизированным ключам).
-     *  filename/key → the exact signed URL the browser requested (canonicalized-key map).
-     *  Записывается только pump-ом sniffера; читается download-воркером (без вызовов Playwright).
+    /** filename/key → the exact signed URL the browser requested (canonicalized-key map).
      *  Written only by the sniffer pump; read by the download worker (no Playwright calls). */
     private final Map<String, String> recorded = new ConcurrentHashMap<>();
 
@@ -65,9 +52,6 @@ public final class SourceRecord {
     private volatile String referer;
     private volatile String origin;
     /**
-     * Записи YOUTUBE: сырой JSON ytInitialPlayerResponse, снятый на pump-стороне
-     * через page.evaluate (подписные URL потоков живут здесь; никогда не логируются,
-     * никогда не печатаются).
      * YOUTUBE records: the raw ytInitialPlayerResponse JSON captured pump-side via
      * page.evaluate (signed stream URLs live here; never logged, never printed).
      */
@@ -91,30 +75,24 @@ public final class SourceRecord {
     public void setState(State s) { state = s; }
 
     public String masterUrl() { return masterUrl; }
-    /** pump-ом только: повышение до подписанного URL соответствующего события манифеста.
-     *  pump-only: upgrade to the signed URL of a matching manifest event. */
+    /** pump-only: upgrade to the signed URL of a matching manifest event. */
     public void setMasterUrl(String url) { masterUrl = url; }
 
-    /** pump-ом только: запомнить точный подписанный URL, который браузер извлёк по ключу имени файла.
-     *  pump-only: remember the exact signed URL the browser fetched for a filename key. */
+    /** pump-only: remember the exact signed URL the browser fetched for a filename key. */
     public void putRecorded(String key, String url) { recorded.put(key, url); }
 
-    /** поиск на стороне воркера URL, записанного браузером; null, если не запрашивался.
-     *  worker-side lookup of a browser-recorded URL; null if never requested. */
+    /** worker-side lookup of a browser-recorded URL; null if never requested. */
     public String recordedUrl(String key) { return recorded.get(key); }
 
-    /** представление только для чтения карты записанных URL (диагностика/тесты).
-     *  read-only view of the recorded map (diagnostics/tests). */
+    /** read-only view of the recorded map (diagnostics/tests). */
     public java.util.Map<String, String> recordedView() {
         return java.util.Collections.unmodifiableMap(recorded);
     }
 
-    /** Доступные высоты (p, px), по убыванию. Записывается только pump-ом sniffера.
-     *  Available heights (p, px), descending. Written only by the sniffer pump. */
+    /** Available heights (p, px), descending. Written only by the sniffer pump. */
     public List<Integer> qualities() { return qualities; }
 
-    /** Высоты по убыванию, без повторов, из манифеста. Pump-only.
-     *  Sorted descending, distinct heights from the manifest. Pump-only. */
+    /** Sorted descending, distinct heights from the manifest. Pump-only. */
     public void setQualities(List<Integer> qs) {
         TreeSet<Integer> set = new TreeSet(Comparator.reverseOrder());
         for (int h : qs) {
@@ -125,8 +103,7 @@ public final class SourceRecord {
         qualities = List.copyOf(set);
     }
 
-    /** Максимальное доступное качество, 0 при неизвестном.
-     *  Highest available quality, 0 if unknown. */
+    /** Highest available quality, 0 if unknown. */
     public int maxQuality() {
         return qualities.isEmpty() ? 0 : qualities.get(0);
     }
@@ -158,15 +135,13 @@ public final class SourceRecord {
     public String outPath() { return outPath; }
     public void setOutPath(String p) { outPath = p; }
 
-    /** Заголовки запроса, снятые pump-ом sniffера (единственный вызывающий Playwright).
-     *  Fetch headers snapshotted by the sniffer pump (sole Playwright caller). */
+    /** Fetch headers snapshotted by the sniffer pump (sole Playwright caller). */
     public void setFetchHeaders(String cookieHeader, String userAgent) {
         this.cookieHeader = cookieHeader;
         this.userAgent = userAgent;
     }
 
-    /** Полный снимок заголовков запроса, как отправил браузер (probe17: Referer/Cookie CDN).
-     *  Full request-header snapshot as the browser sent it (probe17: CDN Referer/Cookie). */
+    /** Full request-header snapshot as the browser sent it (probe17: CDN Referer/Cookie). */
     public void setFetchHeaders(String cookieHeader, String userAgent, String referer, String origin) {
         this.cookieHeader = cookieHeader;
         this.userAgent = userAgent;
@@ -178,19 +153,16 @@ public final class SourceRecord {
     public String referer() { return referer; }
     public String origin() { return origin; }
 
-    /** pump-ом только: сырой JSON ytInitialPlayerResponse для записей YOUTUBE.
-     *  pump-only: raw ytInitialPlayerResponse JSON for YOUTUBE records. */
+    /** pump-only: raw ytInitialPlayerResponse JSON for YOUTUBE records. */
     public void setPayload(String json) { payload = json; }
 
-    /** на стороне воркера: JSON player response, null если не снят.
-     *  worker-side: player response JSON, null if not captured. */
+    /** worker-side: player response JSON, null if not captured. */
     public String payload() { return payload; }
 
     public boolean isCancelled() { return cancelled.get(); }
     public void cancel() { cancelled.set(true); }
 
-    /** Неизменяемый снимок для отрисовки UI.
-     *  Immutable snapshot for UI rendering. */
+    /** Immutable snapshot for UI rendering. */
     public View snapshot() {
         return new View(canonicalUrl, kind, pageUrl, pageTitle, state, sizeBytes.get(),
                 segmentsDone.get(), segmentsTotal.get(), bytesReceived.get(),

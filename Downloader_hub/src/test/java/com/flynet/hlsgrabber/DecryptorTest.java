@@ -9,8 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Тесты AES-128-дешифрования (TZ раздел 9): round-trip, IV из последовательности, парсинг IV.
- *  AES-128 decryption tests (TZ section 9): round-trip, IV from sequence, IV parsing. */
+/** AES-128 decryption tests (TZ section 9): round-trip, IV from sequence, IV parsing. */
 class DecryptorTest {
 
     private static byte[] key16() {
@@ -76,8 +75,6 @@ class DecryptorTest {
 
     @Test
     void decryptMatchesKnownVector() throws Exception {
-        // Known-answer стиль: шифруем ровно так, как ffmpeg HLS AES-128 (IV = BE последовательности),
-        // затем дешифруем Decryptor’ом, посимвольное равенство.
         // Known-answer style: encrypt exactly as ffmpeg HLS AES-128 does (IV = sequence BE),
         // then decrypt with Decryptor, byte-for-byte equality.
         byte[] key = key16();

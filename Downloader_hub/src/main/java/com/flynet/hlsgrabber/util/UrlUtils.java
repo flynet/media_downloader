@@ -5,16 +5,14 @@ import java.net.URISyntaxException;
 import java.util.Set;
 
 /**
- * URL-хелперы: разрешение относительных ссылок плейлистов, канонизация URL для dedup /
  * URL helpers: resolving relative playlist references, canonicalizing URLs for dedup.
  */
 public final class UrlUtils {
 
-    /** Query-параметры, обычно несущие volatile токены (подписи, сессии, TTL) / Query parameters that commonly carry volatile tokens (signatures, sessions, TTL). */
+    /** Query parameters that commonly carry volatile tokens (signatures, sessions, TTL). */
     private static final Set<String> VOLATILE_PARAMS = Set.of(
             "token", "sig", "signature", "auth", "session", "key", "exp", "expires",
             "secure", "ttl", "ts", "timestamp", "time", "hash", "h", "s", "v",
-            // phncdn CDN: h= подпись, e= expiry, f= флаг — всё volatile per-file
             // phncdn CDN: h= signature, e= expiry, f= flag — all per-file volatile
             "e", "f");
 
@@ -22,8 +20,6 @@ public final class UrlUtils {
     }
 
     /**
-     * Разрешает ссылку от базового URL манифеста, сохраняя base query, если ссылка
-     * своего не несёт (наследование token/signature), по TZ 6.1 /
      * Resolve a reference from a base manifest URL, preserving the base query if the
      * reference carries none (token/signature inheritance), per TZ 6.1.
      */
@@ -45,9 +41,6 @@ public final class UrlUtils {
             } else {
                 URI resolved = baseUri.resolve(refUri);
                 String mergedQuery = mergeQuery(baseUri.getRawQuery(), resolved.getRawQuery());
-                // композиция из RAW-компонентов: многопараметровый URI ctor повторно
-                // кодирует уже закодированный query (%2B -> %252B), что ломает CDN-подписи
-                // (phncdn h= параметр -> HTTP 500 на каждом сегменте)
                 // compose from RAW components: the multi-arg URI ctor re-encodes an
                 // already-encoded query (%2B -> %252B), which breaks CDN signatures
                 // (phncdn h= param -> HTTP 500 on every segment)
@@ -60,8 +53,6 @@ public final class UrlUtils {
     }
 
     /**
-     * Композиция URL-строки из raw (уже percent-encoded) компонентов БЕЗ повторного
-     * кодирования: scheme://userInfo@host:port/rawPath?rawQuery /
      * Compose a URL string from raw (already percent-encoded) components WITHOUT
      * re-encoding them: scheme://userInfo@host:port/rawPath?rawQuery.
      */
@@ -103,7 +94,6 @@ public final class UrlUtils {
     }
 
     /**
-     * Канон-форма для dedup (TZ 5.2.4): убрать fragment, убрать volatile query-параметры /
      * Canonical form for dedup (TZ 5.2.4): drop fragment, drop volatile query params.
      */
     public static String canonicalize(String url) {
@@ -126,8 +116,6 @@ public final class UrlUtils {
                 }
                 kept = sb.length() == 0 ? null : sb.toString();
             }
-            // raw композиция (см. composeRaw): повторное кодирование raw query здесь
-            // портит signature-параметры так же, как в resolve()
             // raw composition (see composeRaw): re-encoding a raw query here corrupts
             // signature-carrying params the same way as in resolve()
             return composeRaw(uri, kept);
@@ -144,7 +132,6 @@ public final class UrlUtils {
     }
 
     /**
-     * true когда Content-Type помечает HLS/DASH манифест, или URL кончается .m3u8/.mpd (TZ 5.1) /
      * true when Content-Type marks an HLS/DASH manifest, or URL ends with .m3u8/.mpd (TZ 5.1).
      */
     public static boolean isManifestCandidate(String url, String contentType) {
@@ -163,7 +150,6 @@ public final class UrlUtils {
     }
 
     /**
-     * true когда Content-Type помечает direct MP4, или URL кончается .mp4 (TZ 5.1, query игнорируется) /
      * true when Content-Type marks direct MP4, or URL ends with .mp4 (TZ 5.1, query ignored).
      */
     public static boolean isDirectMp4Candidate(String url, String contentType) {
@@ -175,9 +161,6 @@ public final class UrlUtils {
     }
 
     /**
-     * true когда path URL — медиальный сегмент (.m4s/.ts/.mp2t): сегменты принадлежат
-     * плейлисту/манифесту и никогда не должны становиться самостоятельными источниками
-     * (TZ 5.1, находка реальных сайтов: сегменты Pornhub несут Content-Type video/mp4) /
      * true when the URL path is a media segment (.m4s/.ts/.mp2t) — segments belong to a
      * playlist/manifest and must never become standalone sources (TZ 5.1, real-site finding:
      * Pornhub segments carry Content-Type video/mp4).
@@ -185,15 +168,11 @@ public final class UrlUtils {
     public static boolean isSegmentPath(String path) {
         String p = path.toLowerCase();
         return p.endsWith(".m4s") || p.endsWith(".ts") || p.endsWith(".mp2t")
-                // phncdn: AES-128 key-файл <dir>/index-v1-a1.key?h=.., подписан per path
                 // phncdn: AES-128 key file <dir>/index-v1-a1.key?h=.., signed per path
                 || p.endsWith(".key");
     }
 
     /**
-     * Каноническая директория URL: канонизированная форма без последнего path-сегмента,
-     * trailing slash сохранён (напр. scheme://host/dir/). Используется для family/record
-     * matching /
      * Canonical directory of a URL: canonicalized form without the last path segment,
      * trailing slash kept (e.g. scheme://host/dir/). Used for family/record matching.
      */
@@ -203,14 +182,14 @@ public final class UrlUtils {
         return idx > 0 ? c.substring(0, idx + 1) : "";
     }
 
-    /** Последний path-сегмент канонизированного URL (query/fragment сняты) / Last path segment of the canonicalized URL (query/fragment stripped). */
+    /** Last path segment of the canonicalized URL (query/fragment stripped). */
     public static String lastSegment(String url) {
         String c = canonicalize(url);
         int idx = c.lastIndexOf('/');
         return idx >= 0 ? c.substring(idx + 1) : c;
     }
 
-    /** path-часть URL, query/fragment сняты (TZ: "do query") / path part of URL, query/fragment stripped (TZ: "do query"). */
+    /** path part of URL, query/fragment stripped (TZ: "do query"). */
     public static String pathOf(String url) {
         try {
             URI uri = new URI(url);
@@ -220,7 +199,7 @@ public final class UrlUtils {
         }
     }
 
-    /** scheme://host[:port] origin из URL страницы (для Origin request-заголовка) / scheme://host[:port] origin from a page URL (for the Origin request header). */
+    /** scheme://host[:port] origin from a page URL (for the Origin request header). */
     public static String originOf(String url) {
         try {
             URI uri = new URI(url);
@@ -238,9 +217,6 @@ public final class UrlUtils {
     }
 
     /**
-     * scheme://host/path с снятым query+fragment — безопасная форма для log/exception
-     * сообщений. YouTube googlevideo stream URL несут s/sp/signature-параметры, которые
-     * никогда не должны попадать в консоль или log-файл; phncdn h=/e=/f= similarly /
      * scheme://host/path with query+fragment STRIPPED — the safe form for log/exception
      * messages. YouTube googlevideo stream URLs carry s/sp/signature parameters that
      * must never reach the console or the log file; phncdn h=/e=/f= params likewise.
@@ -273,10 +249,6 @@ public final class UrlUtils {
     }
 
     /**
-     * YouTube video id из watch/shorts/youtu.be URL, null иначе. Канонический ключ
-     * YouTube-строк — {@code "yt:" + id}: канонизация watch URL сбрасывает {@code v}
-     * параметр (VOLATILE_PARAMS), что при SPA-навигации схлопнуло бы все видео
-     * youtube.com в один ключ строки /
      * YouTube video id from a watch/shorts/youtu.be URL, null otherwise.
      * Canonical key for YouTube rows is {@code "yt:" + id}: watch URL canonicalization
      * drops the {@code v} param (VOLATILE_PARAMS), which would collapse every video of

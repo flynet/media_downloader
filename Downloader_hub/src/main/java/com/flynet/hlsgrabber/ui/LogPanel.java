@@ -10,12 +10,6 @@ import java.nio.file.Path;
 import java.util.function.Supplier;
 
 /**
- * Нижняя секция GUI: лог (последние {@value #MAX_LINES} строк, trim при
- * переполнении), кнопки «Очистить» и «Открыть папка», автопрокрутка.
- *
- * <p>Лог пишется через SLF4J (файл + консоль + GUI-аппендер); все
- * изменения текста — только через SwingUtilities.invokeLater.
- *
  * Bottom GUI section: log (last {@value #MAX_LINES} lines, trim on overflow),
  * Clear and Open folder buttons, autoscroll.
  *
@@ -28,8 +22,8 @@ public class LogPanel extends JPanel {
     static final int TRIM_KEEP = 1000;
 
     private final JTextArea area = new JTextArea();
-    private final JCheckBox autoscroll = new JCheckBox("Автокрутка / Autoscroll", true);
-    private final JLabel statusLabel = new JLabel("Инициализация… / Initializing…", SwingConstants.LEFT);
+    private final JCheckBox autoscroll = new JCheckBox("Autoscroll", true);
+    private final JLabel statusLabel = new JLabel("Initializing…", SwingConstants.LEFT);
     private final Supplier<Path> dirSupplier;
 
     public LogPanel(Supplier<Path> dirSupplier) {
@@ -43,9 +37,9 @@ public class LogPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
 
         JPanel row = new JPanel(new GridLayout(1, 4));
-        JButton clear = new JButton("Очистить / Clear");
+        JButton clear = new JButton("Clear");
         clear.addActionListener(e -> area.setText(""));
-        JButton open = new JButton("Открыть папку / Open folder");
+        JButton open = new JButton("Open folder");
         open.addActionListener(e -> openLogDir());
         row.add(clear);
         row.add(open);
@@ -54,8 +48,7 @@ public class LogPanel extends JPanel {
         add(row, BorderLayout.NORTH);
     }
 
-    /** Вызывается из SwingLogAppender; append на EDT.
-     * Called from SwingLogAppender; append on the EDT. */
+    /** Called from SwingLogAppender; append on the EDT. */
     public void appendLine(String line) {
         SwingUtilities.invokeLater(() -> {
             boolean atEnd = isCaretAtEnd();
@@ -67,30 +60,26 @@ public class LogPanel extends JPanel {
         });
     }
 
-    /** Статусная строка — состояние запуска/браузера, EDT-safe.
-     * Status line — launch/browser state, EDT-safe. */
+    /** Status line — launch/browser state, EDT-safe. */
     public void setStatusLine(String text) {
         SwingUtilities.invokeLater(() -> statusLabel.setText(text == null ? "" : text));
     }
 
-    /** Снимок статусной строки — для смоук-харнесса.
-     * Status line snapshot — for the smoke harness. */
+    /** Status line snapshot — for the smoke harness. */
     public String statusText() {
         try {
             SwingUtilities.invokeAndWait(() -> { });
         } catch (Exception e) {
-            // EDT уже заблокирован вызывающим потоком / EDT already blocked the caller
+            // EDT already blocked the caller
         }
         return statusLabel.getText();
     }
 
-    /** Снимок текста консоли (EDT-safe; используется смоук-харнессом GUI).
-     * Current console text (EDT-safe snapshot; used by the GUI smoke harness). */
+    /** Current console text (EDT-safe snapshot; used by the GUI smoke harness). */
     public String textSnapshot() {
         try {
             SwingUtilities.invokeAndWait(() -> { });
         } catch (Exception e) {
-            // EDT уже заблокировал вызывающий поток; читаем как есть
             // EDT already blocked the caller; read as-is
         }
         return area.getText();
@@ -110,7 +99,7 @@ public class LogPanel extends JPanel {
             int end = area.getLineStartOffset(remove);
             area.replaceRange("", 0, end);
         } catch (BadLocationException e) {
-            // ignore: строки уже изменились / lines have already changed
+            // ignore: lines have already changed
         }
     }
 
@@ -120,12 +109,10 @@ public class LogPanel extends JPanel {
             if (Desktop.isDesktopSupported()) {
                 Desktop.getDesktop().open(dir.toFile());
             } else {
-                appendLine("Открыть папку нельзя: Desktop не поддерживается "
-                        + "/ Cannot open folder: Desktop not supported");
+                appendLine("Cannot open folder: Desktop not supported");
             }
         } catch (Exception e) {
-            appendLine("Не могу открыть папку: " + e.getMessage()
-                    + " / Cannot open folder: " + e.getMessage());
+            appendLine("Cannot open folder: " + e.getMessage());
         }
     }
 }

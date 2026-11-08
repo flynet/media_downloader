@@ -1,15 +1,12 @@
 package com.flynet.hlsgrabber.download;
 
-/** Прогресс-колбэки загрузок; thread-safe, ожидается использование вне EDT.
- *  Progress callbacks for downloads; thread-safe, non-EDT safe usage expected. */
+/** Progress callbacks for downloads; thread-safe, non-EDT safe usage expected. */
 public interface ProgressListener {
 
-    /** стадия: «загрузка сегментов», «склейка», «мультиплексирование», «загрузка файла».
-     *  stage: "загрузка сегментов", "склейка", "мультиплексирование", "загрузка файла". */
+    /** stage: "segment download", "concatenation", "muxing", "file download". */
     void onProgress(int done, int total, long bytesReceived, String stage);
 
-    /** кооперативная проверка отмены.
-     *  cooperative cancellation check. */
+    /** cooperative cancellation check. */
     boolean isCancelled();
 
     ProgressListener NOOP = new ProgressListener() {

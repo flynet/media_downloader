@@ -5,8 +5,6 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Дешифрование сегментов AES-128 (TZ 6.2): AES/CBC/PKCS5Padding, IV из атрибута
- * IV #EXT-X-KEY, иначе 16-байтное big-endian номера медиа-последовательности.
  * AES-128 segment decryption (TZ 6.2): AES/CBC/PKCS5Padding, IV from the #EXT-X-KEY IV
  * attribute, otherwise 16-byte big-endian of the media sequence number.
  */
@@ -21,16 +19,14 @@ public class Decryptor {
         this.key = key16.clone();
     }
 
-    /** Дешифрует тело сегмента, padding снят.
-     *  Decrypt a segment body, padding removed. */
+    /** Decrypt a segment body, padding removed. */
     public byte[] decrypt(byte[] cipher, byte[] iv16) throws Exception {
         Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
         c.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new IvParameterSpec(iv16));
         return c.doFinal(cipher);
     }
 
-    /** IV из номера медиа-последовательности (16-байтный big-endian) по спецификации HLS.
-     *  IV from media sequence number (16-byte big-endian), per HLS spec. */
+    /** IV from media sequence number (16-byte big-endian), per HLS spec. */
     public static byte[] ivFromSequence(int sequence) {
         byte[] iv = new byte[16];
         long v = sequence & 0xFFFFFFFFL;
@@ -42,8 +38,6 @@ public class Decryptor {
     }
 
     /**
-     * Разбор IV из плейлиста: принимает «0xHEX» (любой регистр) и простой hex,
-     * дополнение слева до 16 байт.
      * Parse IV from the playlist: accepts "0xHEX" (any case) and plain hex,
      * left-padded to 16 bytes.
      */

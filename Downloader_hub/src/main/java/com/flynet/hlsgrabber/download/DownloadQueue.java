@@ -20,10 +20,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Очередь последовательных загрузок (этап 2; TZ 6.1 — параллельные сегменты
- * внутри одной загрузки, параллельность источников — этап 6). Автоматически
- * ставит обнаруженные источники в очередь; заголовки для fetcher берутся
- * со страницы (Referer/UA/Cookie из браузерного профиля, TZ 6.1).
  *
  * Sequential download queue (Stage 2; TZ 6.1 parallel segments applies inside one download,
  * whole-source parallelism comes in stage 6). Auto-enqueues detected sources; headers for the
@@ -83,31 +79,25 @@ public final class DownloadQueue {
     }
 
     /**
-     * TZ 9 (строка 192): загрузка начинается ТОЛЬКО после нажатия кнопки
-     * «Скачать» — рядки остаются в FOUND, пока пользователь не нажмёт кнопку
-     * (SourceRowPanel → RowActions.enqueue). Этот hook только помечает
-     * записи; он никогда не ставит их в очередь.
-     * TZ 9 (line 192): downloads start ONLY after the «Скачать» button click — rows stay
+     * TZ 9 (line 192): downloads start ONLY after the "Download" button click — rows stay
      * in FOUND until the user presses the button (SourceRowPanel → RowActions.enqueue).
      * This hook only annotates records; it never enqueues.
      */
     private void onRecord(SourceRecord rec) {
         if (rec.state() == SourceRecord.State.FOUND && !closing.get()) {
             if (rec.kind == SourceRecord.Kind.DASH) {
-                rec.setMessage("DASH будет поддержан на этапе 7 / DASH is supported at stage 7");
+                rec.setMessage("DASH is supported at stage 7");
                 registry.notifyChanged(rec);
             }
         }
     }
 
-    /** Постановка в очередь по кнопке: ЕДИНСТВЕННЫЙ путь запуска загрузки (TZ 9 строка 192).
-     *  Button-driven enqueue: the ONLY path that starts a download (TZ 9 line 192). */
+    /** Button-driven enqueue: the ONLY path that starts a download (TZ 9 line 192). */
     public void enqueue(SourceRecord rec) {
         enqueue(rec, 0);
     }
 
-    /** Очередь с выбранной высотой видео; 0 — лучшее доступное качество.
-     *  Enqueue with the selected video height; 0 means the best available quality. */
+    /** Enqueue with the selected video height; 0 means the best available quality. */
     public void enqueue(SourceRecord rec, int qualityHeight) {
         if (closing.get()) {
             return;
@@ -122,16 +112,13 @@ public final class DownloadQueue {
         try {
             rec.setState(SourceRecord.State.DOWNLOADING);
             rec.setStartedAtMs(System.currentTimeMillis());
-            rec.setStage("старт / start");
+            rec.setStage("start");
             registry.notifyChanged(rec);
 
             String pageUrl = rec.pageUrl == null ? "" : rec.pageUrl;
-            log.info("Начинаю загрузку / starting download: {} — со страницы / from page {}", rec.canonicalUrl,
+            log.info("starting download: {} — from page {}", rec.canonicalUrl,
                     pageUrl.isEmpty() ? "?" : pageUrl);
             BrowserLauncher l = launcher;
-            // заголовки: приоритет — записанные заголовки запроса события sniffера
-            // (точный cookie/referer/origin, который браузер послал в успешном
-            // CDN-запросе)
             // headers: prefer the recorded request headers of the sniffer event (exact
             // cookie/referer/origin the browser sent on the successful CDN request)
             String cookie = rec.cookieHeader() != null ? rec.cookieHeader()
@@ -152,7 +139,6 @@ public final class DownloadQueue {
             Path outDir = Path.of(settings.downloadDir);
             Path out;
             ProgressListener listener = progressListener(rec);
-            // подписной оригинальный URL (CDN-подписи должны пережить канонизацию)
             // signed original URL (CDN signatures must survive canonicalization)
             String fetchUrl = rec.masterUrl() != null ? rec.masterUrl() : rec.canonicalUrl;
             String name = rec.pageTitle != null && !rec.pageTitle.isBlank()
@@ -163,9 +149,6 @@ public final class DownloadQueue {
                         FileNames.build(outDir.toFile(), name, ".mp4").toPath(),
                         settings.minSizeBytes, listener);
             } else if (rec.kind == SourceRecord.Kind.YOUTUBE) {
-                // YouTube: веб-плеер не даёт URL для скачивания (серверный ABR),
-                // поэтому запись несёт player response от inner-tube, и воркер
-                // сам скачивает подписные потоки (chunked GET + mux FFmpeg).
                 // YouTube: the web player offers no downloadable URL (server-side ABR),
                 // so the record carries the inner-tube player response and the worker
                 // downloads the signed streams itself (chunked GET + FFmpeg mux).
@@ -187,20 +170,20 @@ public final class DownloadQueue {
             }
             rec.setOutPath(out.toString());
             rec.setState(SourceRecord.State.DONE);
-            rec.setStage("готово / done");
-            log.info("Готово / done: {} → {}", rec.canonicalUrl, out);
+            rec.setStage("done");
+            log.info("done: {} → {}", rec.canonicalUrl, out);
         } catch (SegmentDownloader.SkipException e) {
             rec.setState(SourceRecord.State.ERROR);
             rec.setMessage(e.getMessage());
-            log.warn("Источник пропущен / source skipped: {} — {}", rec.canonicalUrl, e.getMessage());
+            log.warn("source skipped: {} — {}", rec.canonicalUrl, e.getMessage());
         } catch (CancelledException e) {
             rec.setState(SourceRecord.State.CANCELLED);
-            rec.setStage("отменено / cancelled");
-            log.info("Отменено / cancelled: {}", rec.canonicalUrl);
+            rec.setStage("cancelled");
+            log.info("cancelled: {}", rec.canonicalUrl);
         } catch (Exception e) {
             rec.setState(SourceRecord.State.ERROR);
             rec.setMessage(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
-            log.warn("Ошибка / error: {} — {}", rec.canonicalUrl, e.toString(), e);
+            log.warn("error: {} — {}", rec.canonicalUrl, e.toString(), e);
         } finally {
             active.remove(rec.canonicalUrl);
             running.decrementAndGet();
@@ -214,8 +197,7 @@ public final class DownloadQueue {
         }
     }
 
-    /** Резервное имя, когда заголовок страницы недоступен: последний сегмент пути без расширения.
-     *  Fallback name when the page title is unavailable: last path segment without extension. */
+    /** Fallback name when the page title is unavailable: last path segment without extension. */
     static String nameFromUrl(String url) {
         String path = url;
         int q = path.indexOf('?');
@@ -245,7 +227,7 @@ public final class DownloadQueue {
         if (yd != null) {
             yd.cancel();
         }
-        log.info("Отмена запроса / cancel requested: {}", rec.canonicalUrl);
+        log.info("cancel requested: {}", rec.canonicalUrl);
     }
 
     public void retry(SourceRecord rec) {

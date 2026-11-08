@@ -6,9 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Парсит HLS-плейлисты (TZ 6.2): мастер-плейлисты (#EXT-X-STREAM-INF, #EXT-X-MEDIA)
- * и медиальные (#EXTINF, #EXT-X-KEY, #EXT-X-MAP, #EXT-X-BYTERANGE,
- * #EXT-X-MEDIA-SEQUENCE, #EXT-X-ENDLIST) /
  * Parses HLS playlists (TZ 6.2): master (#EXT-X-STREAM-INF, #EXT-X-MEDIA) and
  * media (#EXTINF, #EXT-X-KEY, #EXT-X-MAP, #EXT-X-BYTERANGE, #EXT-X-MEDIA-SEQUENCE,
  * #EXT-X-ENDLIST).
@@ -22,7 +19,7 @@ public final class HlsParser {
         return text.contains("#EXT-X-STREAM-INF:");
     }
 
-    /** Парсинг мастер-плейлиста / Parse master playlist. */
+    /** Parse master playlist. */
     public static MasterPlaylist parseMaster(String text) {
         List<MasterPlaylist.Variant> variants = new ArrayList<>();
         List<MasterPlaylist.MediaEntry> media = new ArrayList<>();
@@ -41,7 +38,7 @@ public final class HlsParser {
                         attrs.get("TYPE"), attrs.get("GROUP-ID"), attrs.get("NAME"),
                         attrs.get("URI"), "YES".equals(attrs.get("DEFAULT")), attrs.get("LANGUAGE")));
             } else if (line.equals("#EXT-X-STREAM-INF-END")) {
-                // не реальный тег — игнорируем / not a real tag; ignore
+                // not a real tag; ignore
             } else if (!line.isEmpty() && !line.startsWith("#") && pendingUri != null) {
                 variants.set(variants.size() - 1, withUri(variants.get(variants.size() - 1), line));
                 pendingUri = null;
@@ -69,12 +66,12 @@ public final class HlsParser {
                 v.audioGroup(), v.codecs(), v.name());
     }
 
-    /** Парсинг медиального плейлиста / Parse media playlist. */
+    /** Parse media playlist. */
     public static MediaPlaylist parseMedia(String text) {
         int mediaSequence = 0;
         double targetDuration = 0;
         List<Segment> segments = new ArrayList<>();
-        KeyInfo playlistKey = null;   // текущее состояние ключа / current key state
+        KeyInfo playlistKey = null;   // current key state
         String mapUri = null;
         boolean endList = false;
 
@@ -116,7 +113,7 @@ public final class HlsParser {
         return new MediaPlaylist(mediaSequence, targetDuration, segments, playlistKey, mapUri, endList);
     }
 
-    /** Парсит список атрибутов с учётом значений в кавычках (напр. CODECS="a,b",RESOLUTION=1920x1080) / Parse attribute list honoring quoted values (e.g. CODECS="a,b",RESOLUTION=1920x1080). */
+    /** Parse attribute list honoring quoted values (e.g. CODECS="a,b",RESOLUTION=1920x1080). */
     static Map<String, String> parseAttrs(String attrLine) {
         Map<String, String> map = new LinkedHashMap<>();
         int i = 0;

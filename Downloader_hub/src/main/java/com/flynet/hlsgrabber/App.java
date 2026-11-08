@@ -29,11 +29,6 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Точка входа. GUI-режим (--gui): выбор папки, браузер, двухпанельное окно.
- * CLI-режим обеспечивает проверку ядра Stage 1: {@code App --url <m3u8> --out <folder>}.
- *
- * Коды выхода: 0 = успех, 1 = ошибка загрузки, 2 = usage, 3 = пропущено фильтрами
- * (live/DRM/нет 1080p).
  * Entry point. GUI mode (--gui): folder picker, browser, two-pane window.
  * CLI mode powers Stage 1 core verification: {@code App --url <m3u8> --out <folder>}.
  *
@@ -85,28 +80,27 @@ public class App {
         try {
             Path out;
             if (UrlUtils.isDirectMp4Candidate(o.url, null) && !o.url.toLowerCase().contains(".m3u8")) {
-                log.info("Прямой MP4 / direct MP4: {}", o.url);
+                log.info("direct MP4: {}", o.url);
                 out = downloadDirect(fetcher, o.url, outDir, name);
             } else {
-                log.info("Запуск HLS-загрузки / starting HLS download: {}", o.url);
+                log.info("starting HLS download: {}", o.url);
                 out = downloader.runMaster(o.url, outDir, name, settings.targetHeight);
             }
-            log.info("Готово / done: {}", out);
+            log.info("done: {}", out);
             System.out.println("OK " + out);
             System.exit(0);
         } catch (SegmentDownloader.SkipException e) {
-            log.info("Пропущено / skipped: {}", e.getMessage());
+            log.info("skipped: {}", e.getMessage());
             System.out.println("SKIPPED " + e.getMessage());
             System.exit(3);
         } catch (Exception e) {
-            log.error("Ошибка загрузки / download error: {}", e.toString());
+            log.error("download error: {}", e.toString());
             System.out.println("ERROR " + e);
             System.exit(1);
         }
     }
 
-    /** GUI-режим (TZ 5.2): сначала двухпанельное окно, выбор папки — диалогом поверх
-     * него (отмена = выход 0). GUI mode (TZ 5.2): two-pane window first, folder picker
+    /** GUI mode (TZ 5.2): two-pane window first, folder picker
      * as a dialog over it (cancel = exit 0). */
     private static void runGui() throws Exception {
         Settings settings = Settings.load();
@@ -118,7 +112,7 @@ public class App {
         try {
             ffmpeg = new FfmpegRunner();
         } catch (Exception e) {
-            logPanel.appendLine("FFmpeg недоступен / FFmpeg unavailable: " + e.getMessage());
+            logPanel.appendLine("FFmpeg unavailable: " + e.getMessage());
             System.exit(1);
             return;
         }
@@ -145,7 +139,7 @@ public class App {
             SwingUtilities.invokeAndWait(() -> {
                 JFileChooser chooser = new JFileChooser();
                 chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-                chooser.setDialogTitle("Папка загрузок / Download folder");
+                chooser.setDialogTitle("Download folder");
                 if (settings.downloadDir != null) {
                     File d = new File(settings.downloadDir);
                     if (d.isDirectory()) {
@@ -170,12 +164,12 @@ public class App {
         System.setProperty("hlsdir", settings.downloadDir);
         reconfigureLogging();
         logPanel.appendLine("ffmpeg: " + ffmpeg.version());
-        logPanel.appendLine("Папка загрузок / download folder: " + settings.downloadDir);
+        logPanel.appendLine("download folder: " + settings.downloadDir);
 
         Thread launchThread = new Thread(() -> {
             try {
-                logPanel.setStatusLine("Запускаю браузер… / launching the browser… (первый запуск может занять 10–20 с / first run may take 10–20 s)");
-                logPanel.appendLine("Запускаю браузер (headful, persistent-профиль)… / launching the browser (headful, persistent profile)…");
+                logPanel.setStatusLine("launching the browser… (first run may take 10–20 s)");
+                logPanel.appendLine("launching the browser (headful, persistent profile)…");
                 BrowserLauncher l = new BrowserLauncher(
                         Path.of(settings.downloadDir, ".profile"), settings.userAgent, false);
                 launcher.set(l);
@@ -184,8 +178,6 @@ public class App {
                 for (Page p : l.context().pages()) {
                     sniffer.attach(p);
                 }
-                // пользователь открывает сайт в новой вкладке → цепляем сниффер,
-                // чтобы его строки появлялись
                 // user opens a site in a new tab → attach the sniffer so its rows appear
                 l.context().onPage(page -> {
                     sniffer.attach(page);
@@ -195,23 +187,22 @@ public class App {
                     } catch (Exception e) {
                         u = "?";
                     }
-                    logPanel.appendLine("Новая вкладка / new tab: " + u);
+                    logPanel.appendLine("new tab: " + u);
                 });
-                logPanel.appendLine("Браузер запущен / browser launched: " + l.channel());
-                logPanel.setStatusLine("Браузер готов / browser ready (" + l.channel()
-                        + ") — введите URL и нажмите «Открыть URL / Open URL»");
+                logPanel.appendLine("browser launched: " + l.channel());
+                logPanel.setStatusLine("browser ready (" + l.channel()
+                        + ") — enter the URL and click \"Open URL\"");
                 SwingUtilities.invokeLater(() -> list.setOpenEnabled(true));
             } catch (Exception e) {
-                logPanel.appendLine("Браузер не запущен / browser not launched: " + e);
-                logPanel.setStatusLine("Браузер не запущен / browser not launched — проверьте Chrome/Edge и антивирус / check Chrome/Edge and your antivirus");
+                logPanel.appendLine("browser not launched: " + e);
+                logPanel.setStatusLine("browser not launched — check Chrome/Edge and your antivirus");
             }
         }, "browser-launch");
         launchThread.setDaemon(true);
         launchThread.start();
     }
 
-    /** Перезапуск конфига logback после System.setProperty("hlsdir", ...), чтобы
-     * файловый аппендер попал в папку загрузок. Re-run logback config after
+    /** Re-run logback config after
      * System.setProperty("hlsdir", ...) so file appender lands in downloads. */
     static void reconfigureLogging() {
         try {
@@ -287,7 +278,6 @@ public class App {
                 return new Options(null, null, null, null, null, null, null, false, true);
             }
             if (args.length == 0) {
-                // Двойной клик / запуск из IDE без аргументов: GUI — дефолт продукта.
                 // Double-click / IDE run with no args: GUI is the product default.
                 return new Options(null, null, null, null, null, null, null, false, true);
             }

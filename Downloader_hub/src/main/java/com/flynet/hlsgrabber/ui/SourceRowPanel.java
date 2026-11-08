@@ -13,11 +13,7 @@ import java.util.List;
 /**
  * One source row (TZ 5.2): title, clipped URL (full in tooltip), state line with
  * progress/speed/stage, and a state-dependent action button.
- * Right-click: "Копировать ссылку".
- *
- * Один рядок источника (TZ 5.2): название, обрезанный URL (полный в тултипе),
- * строка состояния с прогрессом/скоростью/этапом и кнопка действия по состоянию.
- * Правый клик: «Копировать ссылку».
+ * Right-click: "Copy link".
  */
 public final class SourceRowPanel extends JPanel {
 
@@ -42,7 +38,7 @@ public final class SourceRowPanel extends JPanel {
     private final JLabel titleLabel = new JLabel();
     private final JLabel urlLabel = new JLabel();
     private final JLabel infoLabel = new JLabel();
-    private final JButton button = new JButton("Скачать / Download");
+    private final JButton button = new JButton("Download");
     private final JComboBox<QualityOption> qualitySelector = new JComboBox<>();
     private List<QualityOption> displayedQualities = List.of();
 
@@ -79,7 +75,7 @@ public final class SourceRowPanel extends JPanel {
         add(east, BorderLayout.EAST);
 
         JPopupMenu popup = new JPopupMenu();
-        JMenuItem copy = new JMenuItem("Копировать ссылку / Copy link");
+        JMenuItem copy = new JMenuItem("Copy link");
         copy.addActionListener(e -> {
             StringSelection sel = new StringSelection(rec.canonicalUrl);
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(sel, null);
@@ -119,14 +115,12 @@ public final class SourceRowPanel extends JPanel {
         }
     }
 
-    /** Должно вызываться на EDT.
-     *  Must be called on the EDT. */
+    /** Must be called on the EDT. */
     public void update(SourceRecord.View v) {
         String title = v.pageTitle() == null || v.pageTitle().isBlank()
-                ? "Видео / Video" : v.pageTitle();
+                ? "Video" : v.pageTitle();
         titleLabel.setText(title);
 
-        // YouTube-рядки ключуятся «yt:<videoId>» (дедуп), но пользователь видит watch-URL.
         // YouTube rows are keyed by "yt:<videoId>" (dedup), but the user sees the watch URL
         String url = v.kind() == SourceRecord.Kind.YOUTUBE && v.pageUrl() != null
                 ? v.pageUrl() : v.canonicalUrl();
@@ -158,7 +152,7 @@ public final class SourceRowPanel extends JPanel {
             }
         }
         if (!options.isEmpty()) {
-            options.add(0, new QualityOption(0, "Лучшее доступное / best available"));
+            options.add(0, new QualityOption(0, "best available"));
         }
         if (options.equals(displayedQualities)) {
             return;
@@ -185,20 +179,20 @@ public final class SourceRowPanel extends JPanel {
     private void updateButtonText(SourceRecord.State state) {
         button.setText(switch (state) {
             case FOUND -> selectedDownloadLabel();
-            case QUEUED, DOWNLOADING -> "Отмена / Cancel";
-            case DONE -> "Открыть папку / Open Folder";
-            case ERROR, CANCELLED -> "Повторить / Retry";
+            case QUEUED, DOWNLOADING -> "Cancel";
+            case DONE -> "Open Folder";
+            case ERROR, CANCELLED -> "Retry";
         });
     }
 
     private String selectedDownloadLabel() {
         if (displayedQualities.isEmpty()) {
-            return "Скачать / Download";
+            return "Download";
         }
         Object selected = qualitySelector.getSelectedItem();
-        String label = selected instanceof QualityOption option ? option.label() : "Лучшее доступное / best available";
-        return label.equals("Лучшее доступное / best available")
-                ? "Скачать лучшее / Download best" : "Скачать / Download " + label;
+        String label = selected instanceof QualityOption option ? option.label() : "best available";
+        return label.equals("best available")
+                ? "Download best" : "Download " + label;
     }
 
     private static String qualitiesText(List<Integer> qualities) {
@@ -222,24 +216,23 @@ public final class SourceRowPanel extends JPanel {
         switch (v.state()) {
             case FOUND: {
                 String q = qualitiesText(v.qualities());
-                return q.isEmpty() ? "Найдено / found"
-                        : "Найдено / Found · качества / qualities: " + q;
+                return q.isEmpty() ? "found"
+                        : "Found · qualities: " + q;
             }
             case QUEUED:
-                return "В очереди / queued";
+                return "queued";
             case DOWNLOADING: {
-                StringBuilder sb = new StringBuilder("Скачивается / downloading");
-                // HLS: сегменты; YouTube: range-чанки подписного потока.
+                StringBuilder sb = new StringBuilder("downloading");
                 // HLS: segments; YouTube: range-chunks of the signed stream
                 if ((v.kind() == SourceRecord.Kind.HLS || v.kind() == SourceRecord.Kind.YOUTUBE)
                         && v.segmentsTotal() > 0) {
-                    sb.append(" · сегменты / segments ").append(v.segmentsDone())
-                            .append(" из / of ").append(v.segmentsTotal())
+                    sb.append(" · segments ").append(v.segmentsDone())
+                            .append(" of ").append(v.segmentsTotal())
                             .append(" (").append(v.segmentsDone() * 100 / v.segmentsTotal()).append("%)");
                 }
                 sb.append(" · ").append(fmtMb(v.bytesReceived()));
                 if (v.kind() == SourceRecord.Kind.MP4 && v.sizeBytes() > 0) {
-                    sb.append(" из / of ").append(fmtMb(v.sizeBytes()))
+                    sb.append(" of ").append(fmtMb(v.sizeBytes()))
                             .append(" (").append(v.bytesReceived() * 100 / v.sizeBytes()).append("%)");
                 }
                 double sec = Math.max(v.elapsedMs(), 1) / 1000.0;
@@ -250,11 +243,11 @@ public final class SourceRowPanel extends JPanel {
                 return sb.toString();
             }
             case DONE:
-                return "Готово / done · " + (v.outPath() == null ? "" : v.outPath());
+                return "done · " + (v.outPath() == null ? "" : v.outPath());
             case ERROR:
-                return "Ошибка / error · " + (v.message() == null ? "" : v.message());
+                return "error · " + (v.message() == null ? "" : v.message());
             case CANCELLED:
-                return "Отменено / cancelled";
+                return "cancelled";
         }
         return v.state().toString();
     }

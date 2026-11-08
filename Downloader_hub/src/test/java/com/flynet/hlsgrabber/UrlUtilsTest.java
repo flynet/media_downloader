@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Тесты UrlUtils (TZ 5.2.4, 6.1): разрешение относительных, наследование query, канонизация.
- *  UrlUtils tests (TZ 5.2.4, 6.1): relative resolution, query inheritance, canonicalization. */
+/** UrlUtils tests (TZ 5.2.4, 6.1): relative resolution, query inheritance, canonicalization. */
 class UrlUtilsTest {
 
     @Test
@@ -86,8 +85,6 @@ class UrlUtilsTest {
 
     @Test
     void resolvePreservesSingleEncodedSignature() {
-        // реальный сбой phncdn (приёмка GUI): плейлист несёт подписные URL на каждый
-        // файл h=...%2B...%3D; resolve() не должен пере-кодировать их (%252B -> HTTP 500)
         // phncdn real-site failure (GUI acceptance): the playlist carries per-file
         // signed URLs h=...%2B...%3D; resolve() must not re-encode them (%252B -> HTTP 500)
         String base = "https://hv-h.phncdn.com/hls/c6541/videos/202611/04/67955105/"
