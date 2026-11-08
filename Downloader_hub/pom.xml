@@ -33,7 +33,7 @@
             <version>${playwright.version}</version>
         </dependency>
 
-        <!-- FFmpeg, windows-x86_64 only (not ffmpeg-platform, it is hundreds of MB) -->
+        <!-- FFmpeg natives: Windows, Linux (x64/arm64), macOS (x64/arm64) -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>ffmpeg</artifactId>
@@ -47,6 +47,31 @@
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
+            <artifactId>ffmpeg</artifactId>
+            <version>${bytedeco.ffmpeg.version}</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>ffmpeg</artifactId>
+            <version>${bytedeco.ffmpeg.version}</version>
+            <classifier>linux-arm64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>ffmpeg</artifactId>
+            <version>${bytedeco.ffmpeg.version}</version>
+            <classifier>macosx-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>ffmpeg</artifactId>
+            <version>${bytedeco.ffmpeg.version}</version>
+            <classifier>macosx-arm64</classifier>
+        </dependency>
+        <!-- javacpp: Loader runtime natives for the same set of platforms -->
+        <dependency>
+            <groupId>org.bytedeco</groupId>
             <artifactId>javacpp</artifactId>
             <version>${javacpp.version}</version>
         </dependency>
@@ -55,6 +80,30 @@
             <artifactId>javacpp</artifactId>
             <version>${javacpp.version}</version>
             <classifier>windows-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${javacpp.version}</version>
+            <classifier>linux-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${javacpp.version}</version>
+            <classifier>linux-arm64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${javacpp.version}</version>
+            <classifier>macosx-x86_64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>javacpp</artifactId>
+            <version>${javacpp.version}</version>
+            <classifier>macosx-arm64</classifier>
         </dependency>
 
         <!-- JSON (YouTube ytInitialPlayerResponse parse) -->

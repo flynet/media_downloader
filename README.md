@@ -1,6 +1,6 @@
 # HLS Grabber
 
-Self-contained Windows app for HLS/DASH downloads.
+Self-contained app for HLS/DASH downloads (Windows, Linux, macOS).
 Open an m3u8/mpd, choose segments, save MP4/MKV without re-encoding.
 
 ![HLS Grabber screenshot](images/screenshot.png)
@@ -11,16 +11,16 @@ Open an m3u8/mpd, choose segments, save MP4/MKV without re-encoding.
 
 | File | What it is | Date | SHA256 |
 | --- | --- | --- | --- |
-| `HLS-Grabber-1.0.0-windows-x64.zip` | Full Windows build: app + bundled runtime (no Java install required). | 08.11.2026 | `F6EA173C…7F66` |
-| `HLS-Grabber-1.0.0.jar` | Bare JAR (requires Java 21). | 08.11.2026 | `3D57C25F…42D59` |
+| `HLS-Grabber-1.0.0-windows-x64.zip` | Full Windows build: app + bundled runtime (no Java install required). | 08.11.2026 | `847439D8…9DB6` |
+| `HLS-Grabber-1.0.0.jar` | Cross-platform JAR (Windows, Linux, macOS; requires Java 21). | 08.11.2026 | `51EC5B33…74E8` |
 
 Download from [Releases](https://github.com/flynet/media_downloader/releases).
 
 Full SHA256 values:
 
 ```
-sha256: F6EA173C828DE2F9516AEC22462D5AEB8CB773886D92BD367788FA908EDA7F66
-sha256: 3D57C25FD7462704DB54CC6474018AB045DA75561305DE2626C0F0BC9DD42D59
+sha256: 847439D8AEF774650CF4717A6DF7C78EC2C9380D497669E43F6E503068BC9DB6
+sha256: 51EC5B337BE0809EE7AA52393351F7D3243346DF12B3900A6A6BD65F12CD74E8
 ```
 
 ### How to install
@@ -34,6 +34,23 @@ sha256: 3D57C25FD7462704DB54CC6474018AB045DA75561305DE2626C0F0BC9DD42D59
    - Put `HLS-Grabber-1.0.0.jar` in the same folder as `HLS Grabber.exe`
    - Run `HLS Grabber.exe` again — the app finds system Java and starts
    > Do not place `HLS-Grabber-1.0.0.jar` in the app folder without `HLS Grabber.exe` — the JAR is not double-clickable, use `java -jar`.
+
+### Running the JAR on Linux and macOS
+
+[Download the JAR](https://github.com/flynet/media_downloader/releases/download/v1.0.0/HLS-Grabber-1.0.0.jar) and run it with Java 21. FFmpeg binaries for Windows, Linux (x64/arm64) and macOS (x64/arm64) are bundled inside the JAR — no system FFmpeg is needed.
+
+1. Install Java 21: [Temurin](https://adoptium.net/temurin/releases/?version=21).
+2. Run:
+   ```bash
+   java -jar HLS-Grabber-1.0.0.jar
+   ```
+3. URL capture opens a browser window — the app uses your system Chrome or Edge. If you have neither, install Chromium once:
+   ```bash
+   java -cp HLS-Grabber-1.0.0.jar com.microsoft.playwright.CLI install chromium
+   ```
+   The browser lands in `~/.cache/ms-playwright` (Linux) and `~/Library/Caches/ms-playwright` (macOS).
+
+On first launch the FFmpeg binaries are extracted from the JAR into a temporary cache; nothing is installed system-wide.
 
 ## Features
 
