@@ -15,9 +15,32 @@ import java.awt.event.WindowEvent;
  */
 public final class MainWindow extends JFrame {
 
+    private final JLabel folderLabel = new JLabel();
+
     public MainWindow(SourceListPanel list, LogPanel logPanel, Settings settings, DownloadQueue queue) {
         super("HLS Grabber — folder: " + settings.downloadDir);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+
+        JPanel header = new JPanel(new BorderLayout(10, 0));
+        header.putClientProperty("role", "panel");
+        header.setBorder(BorderFactory.createEmptyBorder(10, 14, 4, 14));
+        JLabel titleLabel = new JLabel("HLS Grabber");
+        titleLabel.putClientProperty("role", "titleAccent");
+        ThemeManager.applyRoleStyles(titleLabel);
+        folderLabel.setText("Folder: " + (settings.downloadDir == null ? "(not set)" : settings.downloadDir));
+        folderLabel.putClientProperty("role", "secondary");
+        ThemeManager.applyRoleStyles(folderLabel);
+        JButton themeToggle = new JButton("Theme: "
+                + (ThemeManager.current() == Theme.DARK ? "Dark" : "Light"));
+        themeToggle.addActionListener(e -> {
+            ThemeManager.toggle();
+            themeToggle.setText("Theme: "
+                    + (ThemeManager.current() == Theme.DARK ? "Dark" : "Light"));
+        });
+        header.add(titleLabel, BorderLayout.WEST);
+        header.add(folderLabel, BorderLayout.CENTER);
+        header.add(themeToggle, BorderLayout.EAST);
+        add(header, BorderLayout.NORTH);
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, list, logPanel);
         split.setResizeWeight(0.4);
@@ -45,5 +68,11 @@ public final class MainWindow extends JFrame {
                 }
             }
         });
+    }
+
+    /** Reflects the chosen download folder in the header (EDT-safe call sites). */
+    public void setFolder(String dir) {
+        folderLabel.setText("Folder: " + (dir == null ? "(not set)" : dir));
+        setTitle("HLS Grabber — folder: " + dir);
     }
 }

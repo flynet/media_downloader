@@ -44,6 +44,9 @@ public final class SourceListPanel extends JPanel {
         setLayout(new BorderLayout(0, 6));
 
         JPanel top = new JPanel(new BorderLayout(6, 0));
+        top.putClientProperty("role", "panel");
+        top.setBorder(BorderFactory.createEmptyBorder(6, 12, 4, 12));
+        openUrlBtn.putClientProperty("primary", true);
         openUrlBtn.setEnabled(false);
         openUrlBtn.setToolTipText("browser not ready yet");
         openUrlBtn.addActionListener(e -> {
@@ -69,8 +72,11 @@ public final class SourceListPanel extends JPanel {
         add(top, BorderLayout.NORTH);
 
         listArea.setLayout(new BoxLayout(listArea, BoxLayout.Y_AXIS));
+        listArea.putClientProperty("role", "panel");
         listArea.add(Box.createGlue());
-        add(new JScrollPane(listArea), BorderLayout.CENTER);
+        JScrollPane scroll = new JScrollPane(listArea);
+        scroll.setBorder(BorderFactory.createEmptyBorder(4, 10, 10, 10));
+        add(scroll, BorderLayout.CENTER);
 
         SourceRowPanel.RowActions actions = new SourceRowPanel.RowActions() {
             @Override
@@ -121,6 +127,7 @@ public final class SourceListPanel extends JPanel {
             SourceRowPanel row = rows.get(r.canonicalUrl);
             if (row == null) {
                 row = new SourceRowPanel(r, actions);
+                ThemeManager.retheme(row);
                 rows.put(r.canonicalUrl, row);
                 listArea.add(row, listArea.getComponentCount() - 1);
                 added = true;

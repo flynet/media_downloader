@@ -17,6 +17,7 @@ public class Settings {
     public int parallelSegments = 6;          // TZ 6.1
     public String downloadDir;
     public String userAgent;                  // null = browser default UA
+    public String theme = "light";            // "light" | "dark" (GUI theme)
 
     public static Path settingsFile() {
         String appData = System.getenv("APPDATA");
@@ -41,6 +42,7 @@ public class Settings {
             s.parallelSegments = Integer.parseInt(p.getProperty("parallelSegments", "6"));
             s.downloadDir = p.getProperty("downloadDir", null);
             s.userAgent = p.getProperty("userAgent", null);
+            s.theme = p.getProperty("theme", "light");
         }
         return s;
     }
@@ -56,6 +58,7 @@ public class Settings {
         if (userAgent != null) {
             p.setProperty("userAgent", userAgent);
         }
+        p.setProperty("theme", theme);
         Path f = settingsFile();
         try {
             Files.createDirectories(f.getParent());

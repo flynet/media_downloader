@@ -14,6 +14,7 @@ import com.flynet.hlsgrabber.ui.LogPanel;
 import com.flynet.hlsgrabber.ui.MainWindow;
 import com.flynet.hlsgrabber.ui.SourceListPanel;
 import com.flynet.hlsgrabber.ui.SwingLogAppender;
+import com.flynet.hlsgrabber.ui.ThemeManager;
 import com.flynet.hlsgrabber.util.FileNames;
 import com.flynet.hlsgrabber.util.UrlUtils;
 import com.microsoft.playwright.Page;
@@ -104,6 +105,11 @@ public class App {
      * as a dialog over it (cancel = exit 0). */
     private static void runGui() throws Exception {
         Settings settings = Settings.load();
+        ThemeManager.init(settings.theme);
+        ThemeManager.setSaveHook(name -> {
+            settings.theme = name;
+            settings.save();
+        });
 
         LogPanel logPanel = new LogPanel(() -> Path.of(settings.downloadDir));
         SwingLogAppender.setSink(logPanel::appendLine);
@@ -131,6 +137,7 @@ public class App {
 
         SourceListPanel list = new SourceListPanel(registry, queue, launcher);
         MainWindow w = new MainWindow(list, logPanel, settings, queue);
+        ThemeManager.addWindow(w);
         SwingUtilities.invokeLater(() -> w.setVisible(true));
 
         String[] sel = new String[1];
@@ -161,6 +168,7 @@ public class App {
         }
         settings.downloadDir = sel[0];
         settings.save();
+        w.setFolder(settings.downloadDir);
         System.setProperty("hlsdir", settings.downloadDir);
         reconfigureLogging();
         logPanel.appendLine("ffmpeg: " + ffmpeg.version());

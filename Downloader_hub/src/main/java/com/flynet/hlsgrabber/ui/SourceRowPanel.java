@@ -11,8 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One source row (TZ 5.2): title, clipped URL (full in tooltip), state line with
- * progress/speed/stage, and a state-dependent action button.
+ * One source row as a rounded card (TZ 5.2): title, clipped URL (full in tooltip),
+ * state line with progress/speed/stage, and a state-dependent primary action button.
+ * Flat "Apple Glass" card: rounded fill, 1px border (accent on hover), soft shadow
+ * layers; all colors follow the active theme at paint/update time.
  * Right-click: "Copy link".
  */
 public final class SourceRowPanel extends JPanel {
@@ -41,36 +43,40 @@ public final class SourceRowPanel extends JPanel {
     private final JButton button = new JButton("Download");
     private final JComboBox<QualityOption> qualitySelector = new JComboBox<>();
     private List<QualityOption> displayedQualities = List.of();
+    private boolean hover;
 
     public SourceRowPanel(SourceRecord rec, RowActions actions) {
         this.rec = rec;
         this.actions = actions;
 
         setLayout(new BorderLayout(8, 2));
-        setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(180, 180, 180)),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)));
+        setOpaque(false);
+        setBorder(BorderFactory.createEmptyBorder(8, 14, 10, 14));
         setAlignmentX(LEFT_ALIGNMENT);
-        setMaximumSize(new Dimension(Integer.MAX_VALUE, 86));
+        setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
 
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        urlLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-        urlLabel.setForeground(new Color(110, 110, 110));
-        infoLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        titleLabel.putClientProperty("role", "title");
+        urlLabel.putClientProperty("role", "secondary");
+        ThemeManager.applyRoleStyles(titleLabel);
+        ThemeManager.applyRoleStyles(urlLabel);
 
         add(titleLabel, BorderLayout.NORTH);
         add(urlLabel, BorderLayout.CENTER);
         add(infoLabel, BorderLayout.SOUTH);
 
         JPanel east = new JPanel();
+        east.setOpaque(false);
         east.setLayout(new BoxLayout(east, BoxLayout.Y_AXIS));
-        qualitySelector.setPreferredSize(new Dimension(140, qualitySelector.getPreferredSize().height));
-        qualitySelector.setMaximumSize(new Dimension(140, qualitySelector.getPreferredSize().height));
-        qualitySelector.setAlignmentX(Component.CENTER_ALIGNMENT);
+        qualitySelector.setPreferredSize(new Dimension(140, 34));
+        qualitySelector.setMaximumSize(new Dimension(140, 34));
+        qualitySelector.setAlignmentX(Component.LEFT_ALIGNMENT);
         qualitySelector.addActionListener(e -> updateButtonText(rec.state()));
         east.add(qualitySelector);
+        east.add(Box.createVerticalStrut(10));
+        button.putClientProperty("primary", true);
+        button.setMaximumSize(new Dimension(160, 34));
+        button.setAlignmentX(Component.LEFT_ALIGNMENT);
         button.addActionListener(e -> onButton());
-        button.setAlignmentX(Component.CENTER_ALIGNMENT);
         east.add(button);
         add(east, BorderLayout.EAST);
 
@@ -92,6 +98,18 @@ public final class SourceRowPanel extends JPanel {
                 maybe(e);
             }
 
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                hover = true;
+                repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                hover = false;
+                repaint();
+            }
+
             private void maybe(MouseEvent e) {
                 if (e.isPopupTrigger()) {
                     popup.show(SourceRowPanel.this, e.getX(), e.getY());
@@ -106,6 +124,26 @@ public final class SourceRowPanel extends JPanel {
         update(rec.snapshot());
     }
 
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        Theme t = ThemeManager.current();
+        int w = getWidth();
+        int h = getHeight();
+        int r = t.cardRadius();
+        for (int i = 2; i >= 1; i--) {
+            g2.setColor(t.shadow());
+            g2.fillRoundRect(1, 2 + i, w - 3, h - 6, r * 2, r * 2);
+        }
+        g2.setColor(t.cardBackground());
+        g2.fillRoundRect(1, 2, w - 3, h - 6, r * 2, r * 2);
+        g2.setColor(hover ? t.accent() : t.cardBorder());
+        g2.drawRoundRect(1, 2, w - 3, h - 6, r * 2, r * 2);
+        g2.dispose();
+    }
+
     private void onButton() {
         switch (rec.state()) {
             case FOUND -> actions.enqueue(rec, selectedQualityHeight());
@@ -117,27 +155,34 @@ public final class SourceRowPanel extends JPanel {
 
     /** Must be called on the EDT. */
     public void update(SourceRecord.View v) {
+        Theme t = ThemeManager.current();
         String title = v.pageTitle() == null || v.pageTitle().isBlank()
                 ? "Video" : v.pageTitle();
         titleLabel.setText(title);
+        titleLabel.setFont(t.titleFont());
+        titleLabel.setForeground(t.textPrimary());
 
         // YouTube rows are keyed by "yt:<videoId>" (dedup), but the user sees the watch URL
         String url = v.kind() == SourceRecord.Kind.YOUTUBE && v.pageUrl() != null
                 ? v.pageUrl() : v.canonicalUrl();
         urlLabel.setText(url.length() > URL_CLIP ? url.substring(0, URL_CLIP) + "…" : url);
         urlLabel.setToolTipText(url);
+        urlLabel.setFont(t.baseFont());
+        urlLabel.setForeground(t.textSecondary());
 
         updateQualityOptions(v.qualities());
         qualitySelector.setVisible(!displayedQualities.isEmpty());
         qualitySelector.setEnabled(v.state() == SourceRecord.State.FOUND);
 
         infoLabel.setText(stateText(v));
+        infoLabel.setFont(t.baseFont());
         infoLabel.setForeground(switch (v.state()) {
-            case DOWNLOADING -> new Color(30, 90, 200);
-            case DONE -> new Color(20, 130, 45);
-            case ERROR -> new Color(190, 40, 40);
-            case CANCELLED -> new Color(120, 120, 120);
-            default -> Color.BLACK;
+            case FOUND -> t.accent();
+            case QUEUED -> t.textPrimary();
+            case DOWNLOADING -> t.statusDownloading();
+            case DONE -> t.statusDone();
+            case ERROR -> t.statusError();
+            case CANCELLED -> t.statusCancelled();
         });
         updateButtonText(v.state());
     }
